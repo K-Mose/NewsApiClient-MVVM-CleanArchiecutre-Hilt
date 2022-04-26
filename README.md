@@ -167,9 +167,84 @@ Flow는 비동기식으로 데이터 스트림을 계산하여 방출하기 위�
       }
   }  
   ```
-  
 </details>
+</br>
+</br>
+  
+### Remote DataSource 
+우선 `NewsRepository`인터페이스에서 `getNewsHeadlines()`메소드의 뉴스의 헤드라인만 받기 위한 준비를 하겠습니다. 
 
+#### Adding Dependency
+API로 원격 데이터를 받기 위해 Retrofit과 gson converter를 추가합니다. 
+```
+def retrofit_version = "2.9.0"
+implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
+implementation "com.squareup.retrofit2:converter-gson:$retrofit_version"
+```
+
+#### NewsAPIService
+이제 data 계층에 외부 API와 연결할 `NewsAPIService`인터페이스를 추가합니다.  </br>
+***package*** <br>
+![image](https://user-images.githubusercontent.com/55622345/165235882-bd094e5c-8131-4082-ab91-b0a2b8a39b0b.png) <br>
+```kotlin
+interface NewsAPIService {
+    @GET("/v2/top-headlines")
+    suspend fun getTopHeadlines(
+        @Query("country")
+        country: String,
+        @Query("page")
+        page: Int,
+        @Query("apiKey")
+        apiKey: String = BuildConfig.NEWS_API
+    ): Response<APIResponse>
+}
+```
+NewsApi docs에서 나오듯이 Top headlines은 `apiKey`를 필수로 받고, 뉴스를 가져올 나라를 선택하기 위해서 `country`를 추가합니다. 그리고 가져올 페이지를 선택하기 위해 `page`파라메터를 추가합니다. 
+
+#### NewsRemoteDataSource & Impl
+`NewsAPIService`인터페이스가 추가 됐다면, `NewsAPIService`인터페이스를 Repository와 연결할 dataSource를 추가합니다. </br>
+***package*** <br>
+![image](https://user-images.githubusercontent.com/55622345/165236972-1a0d2060-a490-458c-ad4d-14433968c8ee.png)
+```kotlin
+interface NewsRemoteDataSource {
+    suspend fun getTopHeadlines(): Response<APIResponse>
+}
+
+class NewsRemoteDataSourceImpl(
+    private val newsAPIService: NewsAPIService,
+    private val country:String,
+    private val page:Int
+) : NewsRemoteDataSource {
+    override suspend fun getTopHeadlines(): Response<APIResponse> {
+        return newsAPIService.getTopHeadlines(country, page)
+    }
+}
+```
+`NewsRemoteDataSource`인터페이스의 리턴 타입이 Retrofit의 `Response`로 설정한 후, 인터페이스를 구현하는 `NewsRemoteDataSourceImpl`클래스 내에서 생성자로 `NewsAPIService`인터페이스를 받아 `getTopHeadlines()`함수에서 `Response`타입으로 리턴합니다. 
+
+#### NewsRepositoryImpl
+마지막으로 domain layer에서 작성된 `NewsRepository`인터페이스를 구현할 `NewsRepositoryImpl`클래스를 생성 후 
+DataSource와 연결합니다. 
+```kotlin
+class NewsRepositoryImpl(
+    private val newsRemoteDataSource: NewsRemoteDataSource
+) : NewsRepository {
+    override suspend fun getNewsHeadlines(): Resource<APIResponse> {
+        return responseToResource(newsRemoteDataSource.getTopHeadlines())
+    }
+
+    private fun responseToResource(response: Response<APIResponse>): Resource<APIResponse> {
+        if(response.isSuccessful) {
+            response.body()?.let { result ->
+                return Resource.Success(result)
+            }
+        }
+        return Resource.Error(response.message())
+    }
+    ……
+}
+```
+`responseToResource(response: Response<APIResponse>)`함수는 Response의 status 결과에 따라서 성공과 실패로 나눠 `Resource`타입으로 반환하는 함수입니다. 반환된 결과에 따라서 정상 응답의 body와 error메세지를 출력합니다. 
 
 
 ## Ref. 
