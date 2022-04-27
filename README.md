@@ -635,7 +635,9 @@ Hilt로 DI를 하기 위해서 어떤 클래스(인터페이스)들이 의존성
  
 의존성 필요한 객체들을 나열해보면 위에서부터 아래까지 외부 API에서부터 내부 View까지 연결해주는 순서로 이어져있습니다. 
 
-위의 의존성을 추가하기 위해서 presentation 패키지에 di 패키지를 생성 후 아래와 같이 모듈들을 추가합니다. 
+위의 의존성을 추가하기 위해서 presentation 패키지에 di 패키지를 생성 후 아래와 같이 모듈들을 추가합니다. </br>
+![image](https://user-images.githubusercontent.com/55622345/165511804-a3317b30-5206-4b02-8ebb-4512f2000550.png) </br>
+  
 <details>
 <summary>Modules</summary>
 
