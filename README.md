@@ -593,9 +593,7 @@ ViewModel에서 `getNewsHeadlinesUseCase.execute(country, page)`로 `country`와
   }
   ```  
   
-</details>  
-</br>
-</br>
+</details>
   
 ## Dependency Injection With Hilt 
 <details>
@@ -727,7 +725,156 @@ class FactoryModule {
   ```
 </details>
   
+## Layout - Fragment & Navigation Components  
+모든 View 구현에 앞서 
+MainActivity 하단에 Navigation을 추가하여 New Headlines fragment와 Saved News fragment를 이동하는 화면을 구현하겠습니다. 
+
+<details>
+  <summary>build.gradle</summary>
+navigation과 ViewBinding을 사용하기 위해 project와 app level 각각의 build.gradle에 아래와 같이 추가합니다. 
   
+project level  
+```
+dependencies {
+  def nav_version = "2.4.2"
+  classpath "androidx.navigation:navigation-safe-args-gradle-plugin:$nav_version"  
+}
+```
+app level 
+```
+plugins {
+    id 'androidx.navigation.safeargs.kotlin'
+}
+……
+buildFeatures {
+    viewBinding true
+}
+……
+dependencies {
+  def nav_version = "2.4.2"
+  implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
+  implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
+}
+```
+</details>
+
+### Navigation 
+[Navigation Fundmental](https://github.com/K-Mose/NavigationArchitectureComponent) <br>
+Android Resource File로 Navigation을 추가 후 아래와 같이 Destination을 추가합니다. 
+<details>
+<summary>Navigation-Destinations</summary>
+<img src="https://user-images.githubusercontent.com/55622345/165532324-e9c3a318-ef51-4201-a392-ab617c569dc0.png" width="300px"/> </br>
+<img src="https://user-images.githubusercontent.com/55622345/165531946-0be01374-847f-4595-b62b-d022919c58ce.png" width="400px"/>
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/nav_graph"
+    app:startDestination="@id/newsFragment">
+
+    <fragment
+        android:id="@+id/newsFragment"
+        android:name="com.kmose.newsapiclient.NewsFragment"
+        android:label="fragment_news"
+        tools:layout="@layout/fragment_news" >
+        <action
+            android:id="@+id/action_newsFragment_to_infoFragment"
+            app:destination="@id/infoFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/savedFragment"
+        android:name="com.kmose.newsapiclient.savedFragment"
+        android:label="fragment_saved"
+        tools:layout="@layout/fragment_saved" >
+        <action
+            android:id="@+id/action_savedFragment_to_infoFragment"
+            app:destination="@id/infoFragment" />
+    </fragment>
+    <fragment
+        android:id="@+id/infoFragment"
+        android:name="com.kmose.newsapiclient.infoFragment"
+        android:label="fragment_info"
+        tools:layout="@layout/fragment_info" />
+</navigation>
+```
+</details>
+
+그리고 아래와 같이 menu를 추가합니다. 
+<details>
+<summary>Menu</summary>
+  
+<img src="https://user-images.githubusercontent.com/55622345/165533056-fdf4cdf7-0a6e-4af6-a21c-7e4d13189d4d.png" width="250px"/> </br>
+```
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- same id from fragment -->
+    <item
+        android:title="News Headlines"
+        android:icon="@drawable/ic_news_headline_24"
+        android:id="@+id/newsFragment"
+        />
+    <item
+        android:id="@+id/savedFragment"
+        android:title="Saved News"
+        android:icon="@drawable/ic_saved_news_24"
+        />
+
+</menu>
+```
+각 menu의 item의 id는 연동될 fragment의 id와 동일하게 설정합니다. 
+</details>
+ 
+`activity_main.xml`에 `FragmentContainerView`와 `BottomNavigationView`를 아래와 같이 추가합니다. 
+<details>
+<summary>activity_main</summary>
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".MainActivity">
+
+
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/fragmentContainerView"
+        android:name="androidx.navigation.fragment.NavHostFragment"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="7"
+        app:defaultNavHost="true"
+        app:navGraph="@navigation/nav_graph" />
+    
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/btm_nav_news"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        app:menu="@menu/bottom_menu"
+        />
+</LinearLayout>
+```
+</details>
+  
+마지막으로 `MainActivity`에서 navigation을 연결합니다. 
+```kotlin 
+class MainActivity : AppCompatActivity() {
+    private lateinit var binding: ActivityMainBinding
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        val navHostFragment = supportFragmentManager.findFragmentById(R.id.fragmentContainerView) as NavHostFragment
+        val navController = navHostFragment.navController
+        binding.btmNavNews.setupWithNavController(navController)
+    }
+}
+```
 
 
 ## Ref. 
