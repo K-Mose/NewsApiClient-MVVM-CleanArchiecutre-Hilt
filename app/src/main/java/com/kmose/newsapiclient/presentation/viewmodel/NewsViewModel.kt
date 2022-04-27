@@ -28,7 +28,7 @@ class NewsViewModel(
                 // normal flow of successful execution
                 newsHeadlines.postValue(Resource.Loading())
                 val apiResult = getNewsHeadlinesUseCase.execute(country, page)
-                newsHeadlines.postValue(apiResult)6
+                newsHeadlines.postValue(apiResult)
             } else {
                 newsHeadlines.postValue(Resource.Error("Internet is not available"))
             }
