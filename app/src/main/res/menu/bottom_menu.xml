@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- same id from fragment -->
+    <item
+        android:title="News Headlines"
+        android:icon="@drawable/ic_news_headline_24"
+        android:id="@+id/newsFragment"
+        />
+    <item
+        android:id="@+id/savedFragment"
+        android:title="Saved News"
+        android:icon="@drawable/ic_saved_news_24"
+        />
+
+</menu>

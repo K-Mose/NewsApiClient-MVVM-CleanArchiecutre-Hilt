@@ -4,6 +4,8 @@ plugins {
     id 'kotlin-android'
     id 'kotlin-kapt'
     id 'dagger.hilt.android.plugin'
+    id 'androidx.navigation.safeargs.kotlin'
+
 }
 
 android {
@@ -36,9 +38,13 @@ android {
         jvmTarget = '11'
         freeCompilerArgs = ['-Xjvm-default=compatibility'] // ViewModelProvider Error - https://stackoverflow.com/questions/53964192/jvmdefault-and-how-add-compiler-option
     }
+    buildFeatures {
+        viewBinding true
+    }
 }
 
 dependencies {
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
     def lifecycle_version = "2.5.0-alpha06"
     def arch_version = "2.1.0"
     def room_version = "2.4.1"
@@ -47,6 +53,7 @@ dependencies {
     def retrofit_version = "2.7.0"
     def intercept_version = '5.0.0-alpha.5'
     def glide_version = "4.13.0"
+    def nav_version = "2.4.2"
 
     implementation "org.jetbrains.kotlin:kotlin-stdlib:$kotlin_version"
     implementation 'androidx.core:core-ktx:1.7.0'
@@ -64,6 +71,10 @@ dependencies {
     // Hilt
     implementation "com.google.dagger:hilt-android:2.38.1"
     kapt "com.google.dagger:hilt-compiler:2.38.1"
+
+    // Navigation
+    implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
+    implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
 
     implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
     implementation "com.squareup.retrofit2:converter-gson:$retrofit_version"
