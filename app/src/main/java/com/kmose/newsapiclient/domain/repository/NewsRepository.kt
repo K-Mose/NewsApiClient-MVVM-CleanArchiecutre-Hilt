@@ -6,7 +6,7 @@ import com.kmose.newsapiclient.data.util.Resource
 import kotlinx.coroutines.flow.Flow
 
 interface NewsRepository {
-    suspend fun getNewsHeadlines(): Resource<APIResponse> // API Response의 Status에 따라 응답하기 위해서
+    suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse> // API Response의 Status에 따라 응답하기 위해서
     suspend fun getSearchedNews(searchQuery: String): Resource<APIResponse>
     suspend fun saveNews(article: Article)
     suspend fun deleteNews(article: Article)
