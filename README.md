@@ -371,6 +371,26 @@ Coroutine Scope로 테스트하기위해서 `runBlocking`을 사용하였고 `en
 ## Presentation Layer - ViewModel 
 데이터를 View에 출력하기 위해 UseCase에 접근하는 ViewModel을 작성합니다. 
 
+<details>
+<summary>ViewModel Dependencies</summary>
+
+```
+plugins {
+   ……
+  id 'kotlin-kapt'
+}
+……  
+dependencies {
+    // ViewModel
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    // LiveData
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
+    // Annotation processor
+    kapt "androidx.lifecycle:lifecycle-compiler:$lifecycle_version"
+}
+```
+</details>
+
 우선 presentation layer에 viewmodel 패키지를 생성합니다. 그리고 `NewsViewModel`클래스를 생성합니다. 
 ![image](https://user-images.githubusercontent.com/55622345/165432885-48c1804c-b235-4985-89c9-02b90eb1f73d.png)
 
@@ -521,58 +541,189 @@ class NewsViewModelFactory(
 ```
 
 ### ※※ DataSource & UseCase & Repository Changes
-ViewModel에서 `getNewsHeadlinesUseCase.execute(country, page)`로 `country`와 `page` 값을 넘겨주기 위해 아래와 같이 
+ViewModel에서 `getNewsHeadlinesUseCase.execute(country, page)`로 `country`와 `page` 값을 넘겨주기 위해 아래와 같이 수정합니다.
 
 <details>
-<summary><b>DataSource & UseCase & Repository Changes</b></summary>
+  <summary>
+    <b>DataSource & UseCase & Repository Changes</b>
+  </summary>
 
-### NewsRemoteDataSourceImpl
-```kotlin
-class NewsRemoteDataSourceImpl(
-    private val newsAPIService: NewsAPIService
-) : NewsRemoteDataSource {
-    override suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse> {
-        return newsAPIService.getTopHeadlines(country, page)
-    }
-}
-```
+  <b>NewsRemoteDataSourceImpl</b>
+  ```kotlin
+  class NewsRemoteDataSourceImpl(
+      private val newsAPIService: NewsAPIService
+  ) : NewsRemoteDataSource {
+      override suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse> {
+          return newsAPIService.getTopHeadlines(country, page)
+      }
+  }
+  ```
   
-### NewsRemoteDataSource
-```kotlin
-interface NewsRemoteDataSource {
-    suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse>
-}
-```
+  <b>NewsRemoteDataSource</b>
+  ```kotlin
+  interface NewsRemoteDataSource {
+      suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse>
+  }
+  ```
 
-### NewsRepositoryImpl
-```kotlin
-class NewsRepositoryImpl(
-    private val newsRemoteDataSource: NewsRemoteDataSource
-) : NewsRepository {
-    override suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse> {
-        return responseToResource(newsRemoteDataSource.getTopHeadlines(country, page))
-    }  
-  ……
-```
-
-### NewsRepository
-```kotlin
-interface NewsRepository {
-    suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse>  
+  <b>NewsRepositoryImpl</b>
+  ```kotlin
+  class NewsRepositoryImpl(
+      private val newsRemoteDataSource: NewsRemoteDataSource
+  ) : NewsRepository {
+      override suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse> {
+          return responseToResource(newsRemoteDataSource.getTopHeadlines(country, page))
+      }  
     ……
-```
+  ```
 
-### GetNewsHeadlinesUseCase
-```kotlin
-class GetNewsHeadlinesUseCase(private val newsRepository: NewsRepository) {
-    suspend fun execute(country:String, page:Int): Resource<APIResponse> {
-        return newsRepository.getNewsHeadlines(country, page)
-    }
+  <b>NewsRepository</b>
+  ```kotlin
+  interface NewsRepository {
+      suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse>  
+      ……
+  ```
+
+  <b>GetNewsHeadlinesUseCase</b>
+  ```kotlin
+  class GetNewsHeadlinesUseCase(private val newsRepository: NewsRepository) {
+      suspend fun execute(country:String, page:Int): Resource<APIResponse> {
+          return newsRepository.getNewsHeadlines(country, page)
+      }
+  }
+  ```  
+  
+</details>  
+</br>
+</br>
+  
+## Dependency Injection With Hilt 
+<details>
+<summary>build.gradle</summary>
+
+우선 DI를 위해서 project level `build.gradle` dependencies에 
+```
+classpath 'com.google.dagger:hilt-android-gradle-plugin:2.38.1'
+```
+app level `build.gradle`에  plugin과 dependencies를 추가합니다.
+```
+plugins {
+    id 'dagger.hilt.android.plugin' 
 }
-```  
+  
+dependencies {
+    // Hilt
+    implementation "com.google.dagger:hilt-android:2.38.1"
+    kapt "com.google.dagger:hilt-compiler:2.38.1"  
+}
+```
 </details>
 
+Hilt로 DI를 하기 위해서 어떤 클래스(인터페이스)들이 의존성 주입이 필요한지 정렬해 보겠습니다. 
+1. Interface **NewsAPIServie** : `NewsAPIService`인터페이스는 [Retrofit의 객체를 생성](https://github.com/K-Mose/RetrofitWithCoroutines#create-insatnace)이 필요하고 이것은 외부 Retrofit 라이브러에서부터 생성되므로 추가 할 필요가 있습니다. 
   
+2. Interface **NewsRemoteDataSource** : `NewsRemoteDataSource`인터페이스의 구현체 `NewsRemoteDataSourceImpl`클래스는 Retrofit으로 구현한 `NewsAPIService`인터페이스의 `getTopHeadlines`메서드를 필요로 합니다. 
+  그러므로 `NewsRemoteDataSourceImpl`클래스는 `NewAPIService`에 의존성을 갖고 또, `NewsRemoteDataSource`인터페이스의 구현 객체를 필요로 하는 객체에 의존성을 주입하기 위해 추가하여아 합니다. 
+  
+3. Interface **NewsRepository** : `NewsRepository`인터페이스의 구현체 `NewsRepositoryImpl`클래스는 `getNewsHeadlines`메서드에서 `NewsRemoteDataSource`인터페이스의 `getTopHeadlines`메서드를 필요로 합니다. 
+  그러므로 `NewsRepositoryImpl`클래스는 `NewsRemoteDataSource`에 의존성을 갖고 또, `NewsRepository`인터페이스의 구현 객체를 필요로 하는 객체에 의존성을 주입하기 위해 추가하여야 합니다. 
+  
+4. Class **GetNewsHeadlinesUseCase** : `GetNewsHeadlinesUseCase`클래스는 `execute`메서드에서 `NewsRepository`인터페이스의 `getNewsHeadlines`메서드를 필요로 합니다. 
+  그러므로 `GetNewsHeadlinesUseCase`클래스는 NewsRepository`인터페이스에 의존성을 갖고 UseCase는 ViewModel에서 접근할 수 있게 인스턴스를 제공해주어야 하므로 추가하여야 합니다. 
+  
+5. Class **NewsViewModelFactory** : `NewsViewModelFactory`클래스는 View에게 ViewModel 객체를 제공하고, ViewModel에게는 UseCase 객체를 제공해야 하므로 추가하여야 합니다. 
+ 
+의존성 필요한 객체들을 나열해보면 위에서부터 아래까지 외부 API에서부터 내부 View까지 연결해주는 순서로 이어져있습니다. 
+
+위의 의존성을 추가하기 위해서 presentation 패키지에 di 패키지를 생성 후 아래와 같이 모듈들을 추가합니다. 
+<details>
+<summary>Modules</summary>
+
+  ### NetModule
+  ```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class NetModule {
+    @Singleton
+    @Provides
+    fun providesRetrofit(): Retrofit {
+        return Retrofit.Builder()
+            .addConverterFactory(GsonConverterFactory.create())
+            .baseUrl(BuildConfig.NEWS_URL)
+            .build()
+    }
+  
+    @Singleton
+    @Provides
+    fun providesNewsAPIService(
+        retrofit: Retrofit
+    ): NewsAPIService {
+        return retrofit.create(NewsAPIService::class.java)
+    }
+}  
+  ```
+  
+  ### RemoteDataSourceModule
+  ```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class RemoteDataSourceModule {
+    @Singleton
+    @Provides
+    fun providesNewsRemoteDataSource(
+        newsAPIService: NewsAPIService
+    ): NewsRemoteDataSource {
+        return NewsRemoteDataSourceImpl(newsAPIService)
+    }
+}
+  ```
+  
+  ### RepositoryModule
+  ```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class RepositoryModule {
+    @Singleton
+    @Provides
+    fun providesNewsRepository(
+        newsRemoteDataSource: NewsRemoteDataSource
+    ): NewsRepository {
+        return NewsRepositoryImpl(newsRemoteDataSource)
+    }
+}
+  ```
+  
+  ### UseCaseModule
+  ```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class UseCaseModule {
+    @Singleton
+    @Provides
+    fun providesNewsHeadlinesUseCase(
+        newsRepository: NewsRepository
+    ): GetNewsHeadlinesUseCase {
+        return GetNewsHeadlinesUseCase(newsRepository)
+    }
+}
+  ```
+  
+  ### FactoryModule
+  ```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class FactoryModule {
+    @Singleton
+    @Provides
+    fun providesViewModelFactory(
+        app: Application,
+        getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+    ): NewsViewModelFactory {
+        return NewsViewModelFactory(app, getNewsHeadlinesUseCase)
+    }
+}
+  ```
+</details>
   
   
 
