@@ -507,8 +507,74 @@ class NewsViewModel(
 ```
 </details>
 
+### ViewModelFactory
+ViewModel을 작성했으니 <a href="https://github.com/K-Mose/TwoWayDataBinding#viewmodel-with-viewmodelproviderfactory-">ViewModel을 생성해주는 Factory class</a>를 작성합니다. 
+```kotlin
+class NewsViewModelFactory(
+    private val app: Application,
+    private val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return NewsViewModel(app, getNewsHeadlinesUseCase) as T
+    }
+}
+```
 
+### ※※ DataSource & UseCase & Repository Changes
+ViewModel에서 `getNewsHeadlinesUseCase.execute(country, page)`로 `country`와 `page` 값을 넘겨주기 위해 아래와 같이 
 
+<details>
+<summary><b>DataSource & UseCase & Repository Changes</b></summary>
+
+### NewsRemoteDataSourceImpl
+```kotlin
+class NewsRemoteDataSourceImpl(
+    private val newsAPIService: NewsAPIService
+) : NewsRemoteDataSource {
+    override suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse> {
+        return newsAPIService.getTopHeadlines(country, page)
+    }
+}
+```
+  
+### NewsRemoteDataSource
+```kotlin
+interface NewsRemoteDataSource {
+    suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse>
+}
+```
+
+### NewsRepositoryImpl
+```kotlin
+class NewsRepositoryImpl(
+    private val newsRemoteDataSource: NewsRemoteDataSource
+) : NewsRepository {
+    override suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse> {
+        return responseToResource(newsRemoteDataSource.getTopHeadlines(country, page))
+    }  
+  ……
+```
+
+### NewsRepository
+```kotlin
+interface NewsRepository {
+    suspend fun getNewsHeadlines(country:String, page:Int): Resource<APIResponse>  
+    ……
+```
+
+### GetNewsHeadlinesUseCase
+```kotlin
+class GetNewsHeadlinesUseCase(private val newsRepository: NewsRepository) {
+    suspend fun execute(country:String, page:Int): Resource<APIResponse> {
+        return newsRepository.getNewsHeadlines(country, page)
+    }
+}
+```  
+</details>
+
+  
+  
+  
 
 
 ## Ref. 
