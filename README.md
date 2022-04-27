@@ -368,6 +368,149 @@ Coroutine Scope로 테스트하기위해서 `runBlocking`을 사용하였고 `en
 </details>
 
 
+## Presentation Layer - ViewModel 
+데이터를 View에 출력하기 위해 UseCase에 접근하는 ViewModel을 작성합니다. 
+
+우선 presentation layer에 viewmodel 패키지를 생성합니다. 그리고 `NewsViewModel`클래스를 생성합니다. 
+![image](https://user-images.githubusercontent.com/55622345/165432885-48c1804c-b235-4985-89c9-02b90eb1f73d.png)
+
+`NewsViewModel`클래스 내부에서 UseCase에 접근하기 위해 생성자에 `GetNewsHeadlinesUseCase`객체를 파라메터로 지정합니다. 
+```kotlin 
+class NewsViewModel(
+    val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+) : ViewModel()
+```
+
+프로젝트 시나리오에서 Retrofit의 응답은 `Resource`클래스로 받아서 `Success||Loading||Error` 세 가지 중 하나의 상태를 받게 됩니다. 
+`Resource`의 상태에 따라 응답하기위해 ViewModel에서 사용되는 LiveData도 Resource를 받는 LiveData로 전역변수로 선언합니다. </br>
+`val newsHeadlines: MutableLiveData<Resource<APIResponse>> = MutableLiveData()` </br>
+
+```kotlin
+newsHeadlines.postValue(Resource.Loading())
+val apiResult = getNewsHeadlinesUseCase.execute(country, page)
+newsHeadlines.postValue(apiResult)
+```
+처음 상태는 응답을 기다리므로 Loading으로 설정합니다. 그후 응답받은 API 값을 Background Thread에서 변경하기 위해서 `newsHeadlines.postValue(apiResult)`로 값을 변경합니다. 해당 응답이 성공적인지는 `NewsRepositoryImpl`클래스에서 다시한번 응답 값을 가지고 [`Resource`를 결정](#newsrepositoryimpl)하게 됩니다. 
+
+API의 응답이 무조건 성공하는 것은 아닙니다. 인터넷 연결에 따라서 실패할 수도 있고, 응답을 처리하는 중에 에러가 발생할 수 있습니다. 
+우선 인터넷의 연결을 확인하는 코드를 작성합니다. </br>
+*(자주 사용되는 인터넷 상태를 확인하는 코드)*
+```kotlin
+    private fun isNetWorkAvailable(context: Context?): Boolean {
+        if (context == null) return false
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            if (capabilities != null) {
+                when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                        return true
+                    }
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                        return true
+                    }
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> {
+                        return true
+                    }
+                }
+            }
+        } else {
+            val activeNetworkInfo = connectivityManager.activeNetworkInfo
+            if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
+                return true
+            }
+        }
+        return false
+
+    }
+```
+`isNetWorkAvailable()`함수는 `Context`를 파라메터로 받습니다. ViewModel에서는 Application의 Context를 지원하지 못하므로 `NewsViewModel`의 부모를 `AndroidViewModel`로 변경하고 생성자에 `Application`의 인스턴스를 넘겨줍니다. 
+```kotlin 
+class NewsViewModel(
+    val app: Application,
+    val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+) : AndroidViewModel(app)
+```
+
+
+이제 위 코드를 추가하여 뉴스의 헤드라인을 가져오는 `getNewsHeadlines()`함수를 작성합니다. 
+```kotlin
+    fun getNewsHeadlines(country:String, page:Int) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            if(isNetWorkAvailable(app)) {
+                // normal flow of successful execution
+                newsHeadlines.postValue(Resource.Loading())
+                val apiResult = getNewsHeadlinesUseCase.execute(country, page)
+                newsHeadlines.postValue(apiResult)
+            } else {
+                newsHeadlines.postValue(Resource.Error("Internet is not available"))
+            }
+        } catch (e: Exception) {
+            newsHeadlines.postValue(Resource.Error(e.message.toString()))
+        }
+    }
+```
+
+<details>
+<summary>Full-Code</summary>
+
+```kotlin
+class NewsViewModel(
+    val app: Application,
+    val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+) : AndroidViewModel(app) {
+    val newsHeadlines: MutableLiveData<Resource<APIResponse>> = MutableLiveData()
+
+    fun getNewsHeadlines(country:String, page:Int) = viewModelScope.launch(Dispatchers.IO) {
+        try {
+            if(isNetWorkAvailable(app)) {
+                newsHeadlines.postValue(Resource.Loading())
+                val apiResult = getNewsHeadlinesUseCase.execute(country, page)
+                newsHeadlines.postValue(apiResult)
+            } else {
+                newsHeadlines.postValue(Resource.Error("Internet is not available"))
+            }
+        } catch (e: Exception) {
+            newsHeadlines.postValue(Resource.Error(e.message.toString()))
+        }
+
+    }
+
+    private fun isNetWorkAvailable(context: Context?): Boolean {
+        if (context == null) return false
+        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val capabilities = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
+            if (capabilities != null) {
+                when {
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                        return true
+                    }
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                        return true
+                    }
+                    capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> {
+                        return true
+                    }
+                }
+            }
+        } else {
+            val activeNetworkInfo = connectivityManager.activeNetworkInfo
+            if (activeNetworkInfo != null && activeNetworkInfo.isConnected) {
+                return true
+            }
+        }
+        return false
+
+    }
+}  
+```
+</details>
+
+
+
+
+
 ## Ref. 
 **Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
