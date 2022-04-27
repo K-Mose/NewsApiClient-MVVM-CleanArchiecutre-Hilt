@@ -246,11 +246,140 @@ class NewsRepositoryImpl(
 ```
 `responseToResource(response: Response<APIResponse>)`함수는 Response의 status 결과에 따라서 성공과 실패로 나눠 `Resource`타입으로 반환하는 함수입니다. 반환된 결과에 따라서 정상 응답의 body와 error메세지를 출력합니다. 
 
+## Unit Testing With MockWebServer
+안드로이드 유닛테스트는 <a href="https://github.com/K-Mose/UnitTestFundamentals">여기</a>를 보시기 바랍니다.
+
+Retrofit으로 작성된 `NewsAPIService`인터페이스를 가지고 테스트를 하겠습니다. 테스트는 test source set에서 JUnit4로 진행합니다. 
+
+<details>
+  <summary><b>FULL-Test Scenario</b></summary>
+  
+테스트에 앞서 app level `build.gradle`에 의존성을 추가합니다. 
+```
+    implementation "com.squareup.okhttp3:okhttp:4.9.3"
+    
+    testImplementation "com.squareup.okhttp3:mockwebserver:4.9.3"
+    testImplementation "com.google.truth:truth:1.1.3"
+```
+OKHTTP가 MockWebServer와 통신할 때 okHttpName 오류가 날 수도 있기 떄문에 okhttp 의존성도 추가합니다.  
+  
+**!!! 유닛 테스트 중 Retrofit 2.9.0 버전에서는 오류가 발생하여서 2.7.0 버전으로 다운그레이드 하여 진행하였습니다.**
+
+그리고 테스트용의 API 결과 값을 설정하기 위해 `https://newsapi.org/v2/top-headlines?country=kr&page=1&apiKey={API_Key}`의 결과 값을 아래 경로에 `newsresponse.json`파일로 생성합니다. (app\src\main\resources\newsresponse.json) </br>
+![image](https://user-images.githubusercontent.com/55622345/165420784-7afbac31-26bd-4c4e-922d-2697bfc73d00.png)
+
+이제 테스트를 작성하겠습니다. 
+우선 같은 경로로 패키지를 만든 후 테스트 클래스를 만듭니다. </br>
+![image](https://user-images.githubusercontent.com/55622345/165419953-6e20aa85-a122-41b2-a2e0-870f88e94d22.png)
+
+전역변수에 `NewsAPIService`인터페이스의 인스턴스와 `MockWebServer`의 인스턴스를 추가합니다. 
+```kotlin
+class NewsAPIServiceTest {
+    private lateinit var service: NewsAPIService
+    private lateinit var server: MockWebServer
+    
+    ……
+```
+
+그리고 `setUp()`함수와 `tearDown()`함수를 JUnit4로 생성합니다. 
+```kotlin
+    @Before
+    fun setUp() {
+        server = MockWebServer()
+        service = Retrofit.Builder()
+            .baseUrl(server.url(""))
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(NewsAPIService::class.java)
+    }
+    
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+```
+`setUp()`함수에서는 `MockWebServer`와 `NewsAPIService`의 객체를 생성해주고 `tearDown()`함수에서는 server를 종료합니다.
+
+테스트 케이스 작성에 앞서 `MockWebServer`에 Mock 테스트 응답을 추가하는 함수를 작성하겠습니다. 
+```kotlin
+    private fun enqueueMockResponse(
+        fileName:String
+    ) {
+        val inputStream = javaClass.classLoader!!.getResourceAsStream(fileName)
+        val source = inputStream.source().buffer()
+        val mockResponse = MockResponse()
+        mockResponse.setBody(source.readString(Charsets.UTF_8))
+        server.enqueue(mockResponse)
+    }
+```
+해당 파일은 위에서 작성했던 `newsresponse.json`파일을 읽고 `MockResponse`객체에 결과 값의 body를 추가 한 후 생성된 `MockWebServer`에 응답을 추가하는 함수입니다. 자세한 내용은 <a href="https://github.com/square/okhttp/tree/master/mockwebserver">MockWebServcer Git</a>을 확인하길 바랍니다. 
+
+마지막으로 테스트케이스를 추가하겠습니다. 
+```kotlin
+    @Test
+    fun getTopHeadlines_sentRequest_receivedExpected() {
+        runBlocking {
+            enqueueMockResponse("newsresponse.json")
+            val responseBody = service.getTopHeadlines("kr", 0).body()
+            val request = server.takeRequest()
+            val path = "/v2/top-headlines?country=kr&page=1&apiKey=" + BuildConfig.NEWS_API
+            assertThat(responseBody).isNotNull()
+            assertThat(request.path).isEqualTo(path)
+        }
+    }
+```
+Coroutine Scope로 테스트하기위해서 `runBlocking`을 사용하였고 `enqueueMockResponse`함수에 fileName을 넘겨주어 응답 값을 준비합니다. 
+`service`객체에서 `getTopHeadlines`함수를 호출함으로 `MockWebServer`와 통신하고 `service`객체는 앞에서 준비한 응답 값을 받게 됩니다. 여기서 `getTopHeadlines`함수에 넘긴 값으로 API의 주소가 설정되므로 request의 paht 값을 확인하여 실제 예상했던 주소와 일치하는지 확인 할 수 있습니다.   
+
+정확한 기사가 왔는지 확인하기 위해 테스트 케이스를 작성합니다. 아래는 api가 가져온 첫 기사입니다. 
+```josn
+    "articles":
+    [
+        {"source":
+            {"id":null,"name":"Yna.co.kr"},
+            "author":"정래원",
+            "title":……,
+            "description":……,
+            "url":"https://www.yna.co.kr/view/AKR20220426122600504",
+            "urlToImage":……,
+            "publishedAt":"2022-04-26T06:26:28Z",
+        }, 
+        ……
+```
+위 기사와 같은 값을 갖는지 확인하기 위해 아래와 같이 테스트 케이스를 작성한 후 테스트틀 합니다. 
+```kotlin 
+    @Test
+    fun getTopHeadlines_receivedResponse_correctContent() {
+        runBlocking {
+            enqueueMockResponse("newsresponse.json")
+            val responseBody = service.getTopHeadlines("kr", 1).body()
+            val articleList = responseBody!!.articles
+            val article = articleList[0]
+            assertThat(articleList.size).isEqualTo(20)
+            assertThat(article.author).isEqualTo("정래원")
+            assertThat(article.url).isEqualTo("https://www.yna.co.kr/view/AKR20220426122600504")
+            assertThat(article.publishedAt).isEqualTo("2022-04-26T06:26:28Z")
+        }
+    }
+```
+![image](https://user-images.githubusercontent.com/55622345/165424941-04af19be-80c7-4213-a585-b52fd3dd3469.png)<br>
+테스트가 성공적으로 마쳤습니다. 
+
+</details>
+
 
 ## Ref. 
+**Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
 https://kotlinlang.org/docs/flow.html </br>
 https://ngodinhduyquang.medium.com/coroutines-flow-vs-suspend-function-sequence-and-livedata-108a8dc72787 </br>
+
+**NewsAPI** - <br>
 https://newsapi.org/ </br>
+
+**Resource Class** - <br>
 https://medium.com/swlh/kotlin-sealed-class-for-success-and-error-handling-d3054bef0d4e </br>
 https://medium.com/codex/kotlin-sealed-classes-for-better-handling-of-api-response-6aa1fbd23c76 </br>
+
+**MockWebServer** - <br>
+https://github.com/square/okhttp/tree/master/mockwebserver <br>
