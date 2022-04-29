@@ -1176,8 +1176,197 @@ class AdapterModule {
     }
 ```  
   
+## Paging With RecyclerView
+JetPack에서 [Paging 라이브러리](https://developer.android.com/topic/libraries/architecture/paging/v3-overview)를 제공하지만 여기서는 수동으로 기본적인 페이징을 적용해보겠습니다. 
   
+페이징을 적용하기 앞서 페이징이 언제 일어나는지, 어떻게 일어나는지 생각해봅시다. <br>
+![image](https://user-images.githubusercontent.com/55622345/165933463-20db07b4-9547-4d4a-8291-d4148cf4faad.png)
+한 번에 가져오는 뉴스의 갯수는 기본으로 20개 입니다. 스크롤을 끝까지 내렸을 때 마지막 기사의 위치가 20번째라면 다음 페이지로 넘기는 페이징 처리를 하면 될 것입니다. 
   
+그렇다면 이제 페이징 처리를 위한 스크롤 리스너를 추가하겠습니다. 
+### [RecyclerView.OnScrollListener](https://developer.android.com/reference/androidx/recyclerview/widget/RecyclerView.OnScrollListener)
+스크롤 이벤트를 위한 `RecyclerView.OnScrollListener`객체를 `NewsFragment`안에 생성합니다. 
+```kotlin 
+private val onScrollingListener = object : RecyclerView.OnScrollListener() {
+    override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+        super.onScrollStateChanged(recyclerView, newState)  
+    }
+
+    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+        super.onScrolled(recyclerView, dx, dy)    
+    }
+}
+```
+`OnScrollListener`는 스크롤 상태변화를 감지하는 `onScrollStateChanged`메소드와 스크롤이 되었을 때를 불러지는 `onScrolled`메소드가 있습니다.
+  
+각각의 매소드를 작성하기 전에 페이징에 필요한 전역변수들을 추가합니다.
+```kotlin
+    private var isScrolling = false
+    private var isLoading = false
+    private var isLastPage = false
+    private var pages = 0
+```
+`isScrolling`은 스크롤중 여부를 반환하고, `isLoading은` `Resource`의 상태가 `Loading` 여부를 반환하고, `isLastPage`는 마지막 페이지인지 여부를 반환합니다. `pages`는 현재 리스트를 계산하여 페이지를 나타냅니다. 
+  
+그리고 Retrofit의 응답이 성공 했을 때 리스트 값을 계산하여 현재 페이지가 마지막인지 확인합니다. 
+```kotlin
+private fun viewNewsList() {
+    ……
+    is Resource.Success -> {
+        hideProgressBar()
+        response.data?.let {
+            newsAdapter.differ.submitList(it.articles.toList())
+            if (it.totalResults%20 == 0) {
+                pages = it.totalResults / 20
+            } else {
+                pages = it.totalResults / 20 + 1
+            }
+            isLastPage = page == pages
+        }
+    }
+    ……
+}
+```
+
+`onScrollStateChanged`메소드에서 화면이 터치될 때 `isScrolling`의 값을 변경시켜줍니다. 
+```kotlin
+    override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+        super.onScrollStateChanged(recyclerView, newState)
+        if (newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL) {
+            isScrolling = true
+        }
+    }
+```
+
+`onScrolled`메소드에서는 LayoutManger 객체를 가져와 현재 리스트의 크기, 보여지는 아이탬의 갯수와 맨위에 있는 아이템의 위치 값을 가져와서 리스트가 끝에 도달했는지 계산합니다. 
+```kotlin
+    override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+        super.onScrolled(recyclerView, dx, dy)
+        val layoutManager = fragmentNewsBinding.rvNews.layoutManager as LinearLayoutManager
+        val sizeOfTheCurrentList = layoutManager.itemCount
+        val visibleItems = layoutManager.childCount
+        val topPosition = layoutManager.findFirstVisibleItemPosition()
+
+        val hasReachedToEnd = topPosition + visibleItems >= sizeOfTheCurrentList
+        val shouldPaginate = !isLoading && !isLastPage && hasReachedToEnd && isScrolling
+        if (shouldPaginate) {
+            page ++
+            viewModel.getNewsHeadlines(country, page)
+            isScrolling = false
+        }
+    }
+```
+리스트가 끝까지 도달했다면 페이지네이션이 필요한지 확인후 페이지네이션을 실행합니다. 
+  
+<details>
+<summary>Full-Code</summary>
+
+```kotlin
+class NewsFragment : Fragment() {
+    private lateinit var viewModel: NewsViewModel
+    private lateinit var newsAdapter: NewsAdapter
+    private lateinit var fragmentNewsBinding: FragmentNewsBinding
+    private var country = "kr"
+    private var page = 1
+    private var isScrolling = false
+    private var isLoading = false
+    private var isLastPage = false
+    private var pages = 0
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_news, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentNewsBinding = FragmentNewsBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        newsAdapter = (activity as MainActivity).newsAdapter
+        initRecyclerView()
+        viewNewsList()
+    }
+
+    private fun viewNewsList() {
+        viewModel.getNewsHeadlines(country, page)
+        viewModel.newsHeadlines.observe(viewLifecycleOwner) { response ->
+            when (response) {
+                is Resource.Success -> {
+                    hideProgressBar()
+                    response.data?.let {
+                        newsAdapter.differ.submitList(it.articles.toList())
+                        if (it.totalResults%20 == 0) {
+                            pages = it.totalResults / 20
+                        } else {
+                            pages = it.totalResults / 20 + 1
+                        }
+                        isLastPage = page == pages
+                    }
+                }
+                is Resource.Error -> {
+                    hideProgressBar()
+                    response.message?.let {
+                        Toast.makeText(activity, "An Error Occurred : $it", Toast.LENGTH_LONG).show()
+                    }
+                }
+                is Resource.Loading -> {
+                    showProgressBar()
+                }
+            }
+        }
+    }
+
+    private fun initRecyclerView() {
+        fragmentNewsBinding.rvNews.apply {
+            adapter = newsAdapter
+            layoutManager = LinearLayoutManager(activity)
+            addOnScrollListener(this@NewsFragment.onScrollingListener)
+        }
+    }
+
+    private fun showProgressBar() {
+        isLoading = true
+        fragmentNewsBinding.progressBar.visibility = View.VISIBLE
+    }
+
+    private fun hideProgressBar() {
+        isLoading = false
+        fragmentNewsBinding.progressBar.visibility = View.INVISIBLE
+    }
+
+    private val onScrollingListener = object : RecyclerView.OnScrollListener() {
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            super.onScrollStateChanged(recyclerView, newState)
+            if (newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL) {
+                isScrolling = true
+            }
+        }
+
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            super.onScrolled(recyclerView, dx, dy)
+            val layoutManager = fragmentNewsBinding.rvNews.layoutManager as LinearLayoutManager
+            // get size, count, starting poision from layoutManager
+            val sizeOfTheCurrentList = layoutManager.itemCount
+            val visibleItems = layoutManager.childCount
+            val topPosition = layoutManager.findFirstVisibleItemPosition()
+
+            val hasReachedToEnd = topPosition + visibleItems >= sizeOfTheCurrentList
+            val shouldPaginate = !isLoading && !isLastPage && hasReachedToEnd && isScrolling
+            if (shouldPaginate) {
+                page ++ 
+                viewModel.getNewsHeadlines(country, page)
+                isScrolling = false
+            }
+        }
+    }
+
+}
+```
+</details>
+
+
 ## Ref. 
 **Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
