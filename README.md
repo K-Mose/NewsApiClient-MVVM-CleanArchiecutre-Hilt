@@ -829,6 +829,7 @@ Android Resource File로 Navigation을 추가 후 아래와 같이 Destination�
 `activity_main.xml`에 `FragmentContainerView`와 `BottomNavigationView`를 아래와 같이 추가합니다. 
 <details>
 <summary>activity_main</summary>
+  
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
@@ -875,6 +876,272 @@ class MainActivity : AppCompatActivity() {
     }
 }
 ```
+  
+## Layout - RecyclerView
+헤드라인 리스트를 출력할 RecyclerView를 추가합니다. RecyclerView에 리스트로 출력될 아이템은 뉴스의 제목, 이미지, 내용, 발행일 그리고 신문사 이름입니다. 
+
+### RecyclerView - layout
+layout resource 폴더에 위 내용을 포함한 `news_list_item.xml`을 추가합니다.
+<details>
+<summary>news_list_item</summary>
+
+`news_list_item.xml`를 추가하기 앞서 `colors.xml`에 아래 색들을 추가합니다.
+```xml
+    <color name="list_text">#FFFFFFFF</color>
+    <color name="list_background">#2F2C2A</color>
+    <color name="layout_background">#000000</color>
+```
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/list_background"
+    android:layout_marginTop="10dp"
+    >
+    <TextView
+        android:id="@+id/tvTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:ellipsize="end"
+        android:maxLines="3"
+        android:textColor="@color/list_text"
+        android:textSize="15sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="10sp"
+        />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        >
+        <ImageView
+            android:id="@+id/ivArticleImage"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="2"
+            />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="3"
+            android:orientation="vertical"
+            android:layout_marginStart="10dp"
+            >
+            <TextView
+                android:id="@+id/tvDescription"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:maxLines="5"
+                android:text="DESCRIPTION"
+                android:textColor="@color/list_text"
+                android:textSize="15sp"
+                android:layout_weight="3"
+                />
+            <TextView
+                android:id="@+id/tvPublishedAt"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="@color/list_text"
+                />
+
+            <TextView
+                android:id="@+id/tvSource"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="@color/list_text"
+                />
+
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
+```
+</details>
+
+이제 `fragment_news.xml`에 RecyclerView를 추가하고 Retrofit의 응답이 Loading일 때를 위해 ProgressBar를 추가합니다. 
+<details>
+<summary>fragment_news</summary>
+  
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/layout_background"
+    tools:context=".NewsFragment">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_news"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="5dp"
+        />
+    <ProgressBar
+        android:id="@+id/progress_bar"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:visibility="invisible"
+        />
+</LinearLayout>
+```
+</details>
+
+### RecyclerView - Adapter
+RecyclerView의 Layout이 준비되었으니 이제 Adapter를 만들어 `NewsFragment`에 적용하겠습니다. 
+
+presentation layer에 adapter 패키지를 추가한 후 `NewsAdapter`클래스를 생성합니다. <br>
+![image](https://user-images.githubusercontent.com/55622345/165896811-6a88af8a-b4f6-4ee9-a7c1-482cd372e370.png)
+<details>
+<summary>NewsAdapter</summary>
+  
+```kotlin
+class NewsAdapter : RecyclerView.Adapter<NewsAdapter.NewsViewHolder>() {
+    private val callback = object : DiffUtil.ItemCallback<Article>() {
+        override fun areItemsTheSame(oldItem: Article, newItem: Article): Boolean {
+            return oldItem.url == newItem.url
+        }
+
+        override fun areContentsTheSame(oldItem: Article, newItem: Article): Boolean {
+            return oldItem == newItem
+        }
+    }
+
+    val differ = AsyncListDiffer(this, callback)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): NewsViewHolder {
+        var binding =  NewsListItemBinding.inflate(
+            LayoutInflater.from(parent.context), parent, false
+        )
+        return NewsViewHolder(binding)
+    }
+
+    override fun onBindViewHolder(holder: NewsViewHolder, position: Int) {
+        val article = differ.currentList[position]
+        holder.bind(article)
+    }
+
+    override fun getItemCount(): Int = differ.currentList.size
+
+    inner class NewsViewHolder(val binding: NewsListItemBinding) : RecyclerView.ViewHolder(binding.root) {
+        fun bind(article: Article) {
+            binding.tvTitle.text = article.title
+            binding.tvDescription.text = article.description
+            binding.tvPublishedAt.text = article.description
+            binding.tvSource.text = article.publishedAt
+            Glide.with(binding.ivArticleImage.context)
+                .load(article.urlToImage)
+                .into(binding.ivArticleImage)
+        }
+    }
+}
+```
+응답된 뉴스 리스트를 비교하기 위해서 List를 비교하는 [`DiffUtil` 클래스](https://developer.android.com/reference/androidx/recyclerview/widget/DiffUtil#calculateDiff(androidx.recyclerview.widget.DiffUtil.Callback))를 사용하였습니다. 그리고 이미지 로딩을 위해 Gild를 적용하였습니다. 
+```
+    // Glide to app level's build.gradle
+    implementation 'com.github.bumptech.glide:glide:4.13.0'
+    kapt 'com.github.bumptech.glide:compiler:4.13.0'
+```  
+</details>
+
+### init RecyclerView 
+RecyclerView를 위한 Adapter도 준비가 끝났으니 이제 `NewsFragment`에 `NewsAdapter`를 추가합니다. 
+  
+<details>
+<summary>NewsFragment</summary>
+
+```kotlin
+class NewsFragment : Fragment() {
+    private lateinit var viewModel: NewsViewModel
+    private lateinit var newsAdapter: NewsAdapter
+    private lateinit var fragmentNewsBinding: FragmentNewsBinding
+    private var country = "kr"
+    private var page = 1
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_news, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentNewsBinding = FragmentNewsBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        initRecyclerView()
+        viewNewsList()
+    }
+
+    private fun viewNewsList() {
+        viewModel.getNewsHeadlines(country, page)
+        viewModel.newsHeadlines.observe(viewLifecycleOwner) { response ->
+            when (response) {
+                is Resource.Success -> {
+                    hideProgressBar()
+                    response.data?.let {
+                        newsAdapter.differ.submitList(it.articles.toList())
+                    }
+                }
+                is Resource.Error -> {
+                    hideProgressBar()
+                    response.message?.let {
+                        Toast.makeText(activity, "An Error Occurred : $it", Toast.LENGTH_LONG).show()
+                    }
+                }
+                is Resource.Loading -> {
+                    showProgressBar()
+                }
+            }
+        }
+    }
+
+    private fun initRecyclerView() {
+        newsAdapter = NewsAdapter()
+        fragmentNewsBinding.rvNews.apply {
+            adapter = newsAdapter
+            layoutManager = LinearLayoutManager(activity)
+        }
+    }
+
+    private fun showProgressBar() {
+        fragmentNewsBinding.progressBar.visibility = View.VISIBLE
+    }
+
+    private fun hideProgressBar() {
+        fragmentNewsBinding.progressBar.visibility = View.INVISIBLE
+    }
+}
+```
+  
+`onViewCreated`에 Adapter를 작성하여 View가 완전히 생성된 직후에 실행되는 함수로 [`onCreateView`에서 일어날 수 있는 초기화 에러](https://stackoverflow.com/questions/25119090/difference-between-oncreateview-and-onviewcreated-in-fragment)를 방지합니다
+</details>
+
+### ViewModel in MainActivity
+`NewsFragment`에서 사용되는 ViewModel은 `(activity as MainActivity).viewModel`로 `MainActivity`에서 가져와 사용합니다. `MainActivity`에서 ViewModel을 생성하여 여러 Fragment에서 공유하여 사용함으로 Singleton과 같은 효과를 낼 수 있습니다. 
+```kotlin
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
+    @Inject
+    lateinit var factory: NewsViewModelFactory
+    lateinit var viewModel: NewsViewModel
+    ……
+    override fun onCreate(savedInstanceState: Bundle?) {
+        ……
+        viewModel = ViewModelProvider(this, factory)[NewsViewModel::class.java]
+    }
+}
+```
 
 
 ## Ref. 
@@ -892,3 +1159,4 @@ https://medium.com/codex/kotlin-sealed-classes-for-better-handling-of-api-respon
 
 **MockWebServer** - <br>
 https://github.com/square/okhttp/tree/master/mockwebserver <br>
+
