@@ -1143,7 +1143,41 @@ class MainActivity : AppCompatActivity() {
 }
 ```
 
+### DI - RecyclerView Adapter 
+`NewsFragment`의 `initRecyclerView()`메소드에서 ``newsAdapter = NewsAdapter()``로 바로 생성자를 생성해서 받은 것을 DI형식으로 변경하겠습니다. 
 
+DI를 위해서 우선 di 패키지에 Adapter의 Module을 생성합니다. 
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class AdapterModule {
+    @Singleton
+    @Provides
+    fun providesNewsAdapter(): NewsAdapter {
+        return NewsAdapter()
+    }
+}
+```
+  
+그리고 `MainActivity`에서 아래의 전역변수를 추가합니다.
+  ```kotlin 
+    @Inject
+    lateinit var newsAdapter: NewsAdapter
+  ```
+마지막으로 `NewsFragment`에서 `newsAdapter = NewsAdapter()`를 제거한 후 `viewModel`을 추가한 방식과 같이 `newsAdapter`를 추가합니다. 
+```
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentNewsBinding = FragmentNewsBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        newsAdapter = (activity as MainActivity).newsAdapter
+        initRecyclerView()
+        viewNewsList()
+    }
+```  
+  
+  
+  
 ## Ref. 
 **Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
