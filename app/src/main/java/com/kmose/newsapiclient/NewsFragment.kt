@@ -5,12 +5,15 @@ import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AbsListView
 import android.widget.Toast
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.kmose.newsapiclient.data.util.Resource
 import com.kmose.newsapiclient.databinding.FragmentNewsBinding
 import com.kmose.newsapiclient.presentation.adapter.NewsAdapter
 import com.kmose.newsapiclient.presentation.viewmodel.NewsViewModel
+import javax.inject.Inject
 
 private const val ARG_PARAM1 = "param1"
 private const val ARG_PARAM2 = "param2"
@@ -21,6 +24,10 @@ class NewsFragment : Fragment() {
     private lateinit var fragmentNewsBinding: FragmentNewsBinding
     private var country = "kr"
     private var page = 1
+    private var isScrolling = false
+    private var isLoading = false
+    private var isLastPage = false
+    private var pages = 0
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
@@ -33,6 +40,7 @@ class NewsFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         fragmentNewsBinding = FragmentNewsBinding.bind(view)
         viewModel = (activity as MainActivity).viewModel
+        newsAdapter = (activity as MainActivity).newsAdapter
         initRecyclerView()
         viewNewsList()
     }
@@ -43,8 +51,15 @@ class NewsFragment : Fragment() {
             when (response) {
                 is Resource.Success -> {
                     hideProgressBar()
+                    Toast.makeText(activity, "Page is $page", Toast.LENGTH_LONG).show()
                     response.data?.let {
                         newsAdapter.differ.submitList(it.articles.toList())
+                        if (it.totalResults%20 == 0) {
+                            pages = it.totalResults / 20
+                        } else {
+                            pages = it.totalResults / 20 + 1
+                        }
+                        isLastPage = page == pages // 같다면 마지막 페이지
                     }
                 }
                 is Resource.Error -> {
@@ -61,18 +76,49 @@ class NewsFragment : Fragment() {
     }
 
     private fun initRecyclerView() {
-        newsAdapter = NewsAdapter()
+        // DI로 변경
+//        newsAdapter = NewsAdapter()
         fragmentNewsBinding.rvNews.apply {
             adapter = newsAdapter
             layoutManager = LinearLayoutManager(activity)
+            addOnScrollListener(this@NewsFragment.onScrollingListener)
         }
     }
 
     private fun showProgressBar() {
+        isLoading = true
         fragmentNewsBinding.progressBar.visibility = View.VISIBLE
     }
 
     private fun hideProgressBar() {
+        isLoading = false
         fragmentNewsBinding.progressBar.visibility = View.INVISIBLE
     }
+
+    private val onScrollingListener = object : RecyclerView.OnScrollListener() {
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            super.onScrollStateChanged(recyclerView, newState)
+            if (newState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL) {
+                isScrolling = true
+            }
+        }
+
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            super.onScrolled(recyclerView, dx, dy)
+            val layoutManager = fragmentNewsBinding.rvNews.layoutManager as LinearLayoutManager
+            // get size, count, starting poision from layoutManager
+            val sizeOfTheCurrentList = layoutManager.itemCount
+            val visibleItems = layoutManager.childCount
+            val topPosition = layoutManager.findFirstVisibleItemPosition()
+
+            val hasReachedToEnd = topPosition + visibleItems >= sizeOfTheCurrentList
+            val shouldPaginate = !isLoading && !isLastPage && hasReachedToEnd && isScrolling
+            if (shouldPaginate) {
+                page ++ // pagination이 진행되면 페이지 증가
+                viewModel.getNewsHeadlines(country, page)
+                isScrolling = false
+            }
+        }
+    }
+
 }

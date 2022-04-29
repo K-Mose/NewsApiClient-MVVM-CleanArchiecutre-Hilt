@@ -7,7 +7,6 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.kmose.newsapiclient.data.model.Article
-import com.kmose.newsapiclient.databinding.FragmentNewsBinding
 import com.kmose.newsapiclient.databinding.NewsListItemBinding
 
 class NewsAdapter : RecyclerView.Adapter<NewsAdapter.NewsViewHolder>() {
