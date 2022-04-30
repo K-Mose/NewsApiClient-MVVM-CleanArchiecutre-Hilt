@@ -1366,6 +1366,121 @@ class NewsFragment : Fragment() {
 ```
 </details>
 
+  
+## Displaying Article - WebView
+헤드라인을 선택하면 `WebView`를 이용해서 기사의 상세내용을 보여주는 화면을 작성하겠습니다. 
+헤드라인을 선택하게 되면 선택된 기사의 내용 즉, `Article`데이터 클래스를 `InfoFragment`로 넘겨주어 프래그먼트 내에있는 `WebView`를 통해 뉴스를 출력하게 됩니다. <br>
+  이를 위해 `RecyclerView`에는 `onClickListener`, `InfoFragment`내에는 `Webview`, `Navigation Graph`에는 전달 액션과 `argument`가 필요합니다. 
+  
+  우선 `Article`데이터 클래스가 전송될 수 있도록 `Serializable`을 상속시킵니다. 
+```kotlin
+data class Article(
+    ……
+) : Serializable
+```
+  
+
+  이제 `NewsAdapter`에 `onClickListener`리스너를 생성합니다. 우선 리스너 객체를 생성한 뒤 setter로 외부에서 등록할 수 있도록 합니다. 
+```kotlin
+    private var onItemClickListener: ((Article)->Unit)? = null
+
+    fun setOnItemClickListener(listener: (Article)->Unit) {
+        onItemClickListener = listener
+    }
+```
+ViewHolder 클래스 내부에서 item layout이 생성될 때 item마다 Listener가 등록될 수 있도록 `bind`함수 내부에 Listener를 등록합니다.
+```kotlin
+inner class NewsViewHolder(val binding: NewsListItemBinding) : RecyclerView.ViewHolder(binding.root) {
+    fun bind(article: Article) {
+        ……
+        binding.root.setOnClickListener {
+            onItemClickListener?.let {
+                it(article)
+            }
+        }
+    }
+}
+```
+  
+  
+`NewsFragment`에서 RecyclerView Adapter에 Listener를 넘겨줍니다. 
+```kotlin
+override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+    ……
+    newsAdapter = (activity as MainActivity).newsAdapter
+    newsAdapter.setOnItemClickListener {
+        val bundle = Bundle().apply {
+            putSerializable("selected_article", it)
+        }
+        findNavController().navigate( R.id.action_newsFragment_to_infoFragment, bundle)
+    }
+    initRecyclerView()
+    viewNewsList()
+}
+```
+위 `Budle`값을 `InfoFragment`에서 받기 위해 `nav_graph`에 아래와 같이 Argument를 추가합니다. <br>
+![image](https://user-images.githubusercontent.com/55622345/166104877-a7767d8e-a36d-4189-96bb-52beac7e6beb.png)
+```xml
+    <fragment
+        android:id="@+id/infoFragment"
+        android:name="com.kmose.newsapiclient.InfoFragment"
+        android:label="fragment_info"
+        tools:layout="@layout/fragment_info" >
+        <argument
+            android:name="selected_article"
+            app:argType="com.kmose.newsapiclient.data.model.Article" />
+    </fragment>
+```
+  
+  
+기사의 상세 내용을 띄울 `InfoFragment`프래그먼트의 layout 파일인 `fragment_info.xml`에 `WebView`를 추가합니다. 
+```kotlin
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    tools:context=".InfoFragment">
+
+    <WebView
+        android:id="@+id/wv_info"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+    />
+
+</LinearLayout>
+```
+
+  
+마지막으로 `Article`객체의 url로 `WebView`를 띄울 수 있게 `InfoFragment`를 수정합니다. 
+```kotlin
+class InfoFragment : Fragment() {
+    private lateinit var fragmentInfoBinding: FragmentInfoBinding
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_info, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentInfoBinding = FragmentInfoBinding.bind(view)
+        val args: InfoFragmentArgs by navArgs()
+        val article = args.selectedArticle
+        fragmentInfoBinding.wvInfo.apply {
+            webViewClient = WebViewClient()
+            if(article.url != "") {
+                loadUrl(article.url)
+            }
+        }
+    }
+}
+```
+`nav_graph.xml`에서 `<fragment@InfoFragment/>`에 `<argument/>`를 추가했기 때문에 `Bundle`로 전송한 데이터를 `InfoFragmentArgs`로 객체를 받습니다. 
+ 그리고 `WebViewClient`를 사용해서 `WebView`를 초기화 후 url 값을 확인하여 `WebView`에 전달하여 화면을 출력합니다. 
 
 ## Ref. 
 **Flow** - <br>
