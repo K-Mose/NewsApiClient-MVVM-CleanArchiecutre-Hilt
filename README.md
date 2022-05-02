@@ -2149,8 +2149,84 @@ class NewsRepositoryImpl(
     }
 ```
 
+## Show Saved Articles
+저장된 기사들을 보여주는 화면은 `NewsFragment`와 같이 RecyclerView를 사용하고, 사용했던 `NewsAdapter`를 그대로 적용합니다. 
+  그러기 위해서 `SavedFragment`의 Layout에 RecyclerView를 추가합니다. 
+<details>
+<summary>fragment_saved.xml</summary>
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/layout_background"
+    tools:context=".SavedFragment">
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_saved_news"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="5dp"
+        />
+
+</LinearLayout>  
+
+```
+</details>  
   
-  
+`SavedFragment`를 `NewsFragment`의 코드에서 `onViewCreated`와 `initRecyclerView`함수와 거의 동일하게 작성합니다.
+<details>
+<summary>SavedFragment.kt</summary>
+
+###
+```kotlin
+class SavedFragment : Fragment() {
+    private lateinit var fragmentSavedBinding: FragmentSavedBinding
+    private lateinit var viewModel: NewsViewModel
+    private lateinit var newsAdapter: NewsAdapter
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_saved, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentSavedBinding = FragmentSavedBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        newsAdapter = (activity as MainActivity).newsAdapter
+        newsAdapter.setOnItemClickListener {
+            val bundle = Bundle().apply {
+                putSerializable("selected_article", it)
+            }
+            findNavController().navigate(
+                R.id.action_savedFragment_to_infoFragment,
+                bundle
+            ) 
+        }
+        initRecyclerView()
+        viewModel.getSavedNews().observe(viewLifecycleOwner) {
+            newsAdapter.differ.submitList(it)
+        }
+    }
+
+    private fun initRecyclerView() {
+        fragmentSavedBinding.rvSavedNews.apply {
+            adapter = newsAdapter
+            layoutManager = LinearLayoutManager(activity)
+        }
+    }
+}
+```
+</details>
+
+`findNavController().navigate`에 들어가는 Action의 id 값은 `action_savedFragment_to_infoFragment`로 바꿔줍니다. 
+
 ## Ref. 
 **Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
