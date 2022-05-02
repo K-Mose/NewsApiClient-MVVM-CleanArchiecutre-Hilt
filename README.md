@@ -1481,6 +1481,265 @@ class InfoFragment : Fragment() {
 ```
 `nav_graph.xml`에서 `<fragment@InfoFragment/>`에 `<argument/>`를 추가했기 때문에 `Bundle`로 전송한 데이터를 `InfoFragmentArgs`로 객체를 받습니다. 
  그리고 `WebViewClient`를 사용해서 `WebView`를 초기화 후 url 값을 확인하여 `WebView`에 전달하여 화면을 출력합니다. 
+  
+**※ CLEAR_TEXT_TRAFFIC ERROR ※** <br>
+  `WebView`에서 페이지를 띄울 때 `CLEAR_TEXT_TRAFFIC ERROR`가 발생한다면 `Manifest`의 `<application/>`에 아래와 같이 추가합니다. 
+  ```xml
+<application
+    ……
+    android:usesCleartextTraffic="true">
+```
+  
+## Searching View - Search Headlines 
+뉴스의 헤드라인을 가져오는 `NewsFragement`에서 `SearchView`를 추가하여 뉴스 검색 기능을 추가하겠습니다. 
+
+우선 `fragment_news.xml`에서 아래와 같이 `SearchView`를 추가합니다. 
+```xml
+<LinearLayout
+    ……>
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/sv_news"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/search_background"
+        />
+    ……
+</LinearLayout>
+```
+
+<details>
+<summary>RetrofitService & RemoteDataSource & Repository & UseCase 수정</summary>
+
+뉴스의 검색 기능은 NewsAPI의 요청 값에서 ![image](https://user-images.githubusercontent.com/55622345/166185182-3dea590e-4410-48d0-9370-0ea8d1767f9c.png)이 필요로 하므로 해당 값을 포함한 요청을 `NewsAPIService`인터페이스에 아래와 같이 추가하겠습니다.
+```kotlin
+interface NewsAPIService {
+    ……
+    @GET("/v2/top-headlines")
+    suspend fun getSearchedTopHeadlines(
+        @Query("country")
+        country: String,
+        @Query("q")
+        searchQuery: String,
+        @Query("page")
+        page: Int,
+        @Query("apiKey")
+        apiKey: String = BuildConfig.NEWS_API
+    ): Response<APIResponse>
+}
+```
+
+다음은 `NewsAPIService`를 사용하는 `NewsRemoteDataSource`인터페이스와 구현 클래스에 검색 함수를 추가합니다. 
+```kotlin
+interface NewsRemoteDataSource {
+    suspend fun getTopHeadlines(country:String, page:Int): Response<APIResponse>
+    suspend fun getSearchedTopHeadlines(country:String, searchQuery:String, page:Int): Response<APIResponse>
+}
+
+class NewsRemoteDataSourceImpl … {
+    ……
+    override suspend fun getSearchedTopHeadlines(
+        country: String,
+        searchQuery: String,
+        page: Int
+    ): Response<APIResponse> {
+        return newsAPIService.getSearchedTopHeadlines(country, searchQuery, page)
+    }
+}  
+```
+  
+`NewsRemoteDataSource`를 수정했으므로 이제 `NewsRepository`를 수정합니다.
+```kotlin
+interface NewsRepository {
+    ……
+    suspend fun getSearchedNews(country:String, searchQuery: String, page:Int): Resource<APIResponse>
+    ……
+}
+
+class NewsRepositoryImpl … {
+    ……
+    override suspend fun getSearchedNews(
+        country: String,
+        searchQuery: String,
+        page: Int
+    ): Resource<APIResponse> {
+        return responseToResource(newsRemoteDataSource.getSearchedTopHeadlines(country, searchQuery, page))
+    }
+    ……
+}
+```
+
+검색 기능이 수행되는 `GetSearchedNewsUseCase`를 수정합니다. 
+```kotlin 
+class GetSearchedNewsUseCase(private val newsRepository: NewsRepository) {
+    suspend fun execute(country:String, searchQuery: String, page:Int): Resource<APIResponse> {
+        return newsRepository.getSearchedNews(country, searchQuery, page)
+    }
+}
+```
+  
+마지막으로 `NewsViewModel`과 `NewsViewModelFactory`를 수정합니다.
+```kotlin
+class NewsViewModel(
+    private val app: Application,
+    private val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase,
+    private val getSearchedNewsUseCase: GetSearchedNewsUseCase
+) : AndroidViewModel(app) {
+    ……
+    // saerch
+    val searchedNews: MutableLiveData<Resource<APIResponse>> = MutableLiveData()
+
+    fun searchNews(country: String, searchQuery: String, page: Int) = viewModelScope.launch {
+        searchedNews.postValue(Resource.Loading())
+        try {
+            if (isNetWorkAvailable(app)) {
+                val response = getSearchedNewsUseCase.execute(country, searchQuery, page)
+                searchedNews.postValue(response)
+            } else {
+                searchedNews.postValue(Resource.Error("No Internet Connection"))
+            }
+        } catch (e: Exception) {
+            searchedNews.postValue(Resource.Error(e.message.toString()))
+        }
+    }
+}
+```
+ViewModel에서 `searchNews`함수는 헤드라인을 가져오는 `getNewsHeadlines`함수와 비슷하게 수행됩니다. 
+```kotlin
+class NewsViewModelFactory(
+    private val app: Application,
+    private val getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase,
+    private val getSearchedNewsUseCase: GetSearchedNewsUseCase
+) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        return NewsViewModel(app, getNewsHeadlinesUseCase, getSearchedNewsUseCase) as T
+    }
+}
+```
+Factory에는 UseCase를 추가합니다. 
+</details>
+
+추가된 함수들이 의존성이 주입될 수 있도록 DI도 수정합니다.
+<details>
+<summary></summary>
+
+
+### UseCaseModule
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class UseCaseModule {
+    @Singleton
+    @Provides
+    fun providesGetNewsHeadlinesUseCase(
+        newsRepository: NewsRepository
+    ): GetNewsHeadlinesUseCase {
+        return GetNewsHeadlinesUseCase(newsRepository)
+    }
+
+    @Singleton
+    @Provides
+    fun providesGetSearchedNewsHeadlinesUseCase(
+        newsRepository: NewsRepository
+    ): GetSearchedNewsUseCase {
+        return GetSearchedNewsUseCase(newsRepository)
+    }
+}
+```
+  
+### FactoryModule
+```kotlin
+@Module
+@InstallIn(SingletonComponent::class)
+class FactoryModule {
+    @Singleton
+    @Provides
+    fun providesViewModelFactory(
+        app: Application,
+        getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase,
+        getSearchedNewsUseCase: GetSearchedNewsUseCase
+    ): NewsViewModelFactory {
+        return NewsViewModelFactory(app, getNewsHeadlinesUseCase, getSearchedNewsUseCase)
+    }
+}
+```
+</details>
+
+이제 `NewsFragment`에서 추가된 `SearchView`가 작동 되도록 검색 기능을 추가하겠습니다. 
+
+우선 API의 응답을 받을 `viewSearchedNews`함수를 작성합니다. 
+```kotlin
+    fun viewSearchedNews() {
+        viewModel.searchedNews.observe(viewLifecycleOwner) { response ->
+            when (response) {
+                is Resource.Success -> {
+                    hideProgressBar()
+                    response.data?.let {
+                        newsAdapter.differ.submitList(it.articles.toList())
+                        pages = if (it.totalResults%20 == 0) {
+                            it.totalResults / 20
+                        } else {
+                            it.totalResults / 20 + 1
+                        }
+                        isLastPage = page == pages
+                    }
+                }
+                is Resource.Error -> {
+                    hideProgressBar()
+                    response.data?.let {
+                        Toast.makeText(activity, "An Error Occurred : $it", Toast.LENGTH_LONG).show()
+                    }
+                }
+                is Resource.Loading -> {
+                    showProgressBar()
+                }
+            }
+
+        }
+    }
+```
+그리고 `SearchView`에 Listener를 추가하기 위한 함수 `setSearchView`를 작성합니다. 
+```kotlin
+    private fun setSearchView() {
+        fragmentNewsBinding.svNews.setOnQueryTextListener(object : SearchView.OnQueryTextListener{
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                viewModel.searchNews("kr", query!!, page)
+                viewSearchedNews()
+                return false
+            }
+
+            // query를 입력할 때 invoked
+            override fun onQueryTextChange(newText: String?): Boolean {
+                MainScope().launch {
+                    delay(1500)
+                    viewModel.searchNews("kr", newText!!, page)
+                    viewSearchedNews()
+                }
+                return false
+            }
+        })
+        fragmentNewsBinding.svNews.setOnCloseListener(object : SearchView.OnCloseListener{
+            override fun onClose(): Boolean {
+                initRecyclerView()
+                viewNewsList()
+                return false
+            }
+        })
+    }
+```
+`OnQueryTextListener`에서 `onQueryTextSubmit`는 검색후 `Enter`버튼을 눌렀을 때 실행되고, `onQueryTextChange`는 검색 값을 입력할 때 마다 실행되는 함수 입니다. `OnCloseListener`의 `onClose`는 검색창을 닫을 때 실행되는 함수입니다. 
+
+이제 `setSearchView`함수를 `onViewCreated`함수에 추가합니다. 
+```kotlin 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        ……
+        initRecyclerView()
+        viewNewsList()
+        setSearchView()
+    }
+```
+  
+
 
 ## Ref. 
 **Flow** - <br>
