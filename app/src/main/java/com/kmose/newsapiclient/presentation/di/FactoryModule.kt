@@ -2,6 +2,7 @@ package com.kmose.newsapiclient.presentation.di
 
 import android.app.Application
 import com.kmose.newsapiclient.domain.usecase.GetNewsHeadlinesUseCase
+import com.kmose.newsapiclient.domain.usecase.GetSearchedNewsUseCase
 import com.kmose.newsapiclient.presentation.viewmodel.NewsViewModelFactory
 import dagger.Module
 import dagger.Provides
@@ -16,8 +17,9 @@ class FactoryModule {
     @Provides
     fun providesViewModelFactory(
         app: Application,
-        getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase
+        getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase,
+        getSearchedNewsUseCase: GetSearchedNewsUseCase
     ): NewsViewModelFactory {
-        return NewsViewModelFactory(app, getNewsHeadlinesUseCase)
+        return NewsViewModelFactory(app, getNewsHeadlinesUseCase, getSearchedNewsUseCase)
     }
 }
