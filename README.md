@@ -1749,7 +1749,7 @@ class FactoryModule {
     kapt "androidx.room:room-compiler:$room_version"
 ```
 
-### Database & DAO
+#### Database & DAO
 그리고 `Article`데이터 클래스에 @Entity 어노테이션을 추가합니다. 
 ```kotlin
 @Entity(tableName = "articles")
@@ -1809,7 +1809,7 @@ abstract class ArticleDatabase : RoomDatabase() {
 }
 ```
 
-### DataSource
+#### DataSource
 Room의 Database클래스까지 추가했다면 이제 Local Data에 연결할 `LocalDataSource`인터페이스와 클래스를 추가합니다. <br>
 ![image](https://user-images.githubusercontent.com/55622345/166233637-184ab22c-4d25-458d-a469-7e78f18fed09.png) <br>
 
@@ -2067,7 +2067,7 @@ class NewsLocalDataSourceImpl(
 }
 ```
 
-### Repository 
+#### Repository 
 [Repository](#repository--usecase)에서 작성된 `NewsRepository`인터페이스의 구현체에 기사 저장 함수들을 추가합니다. 
 ```kotlin
 class NewsRepositoryImpl(
@@ -2091,7 +2091,7 @@ class NewsRepositoryImpl(
   
 
   
-## Save Article
+### Save Article
 기사를 저장하기 앞서 `InfoFragment`의 Layout에 저장 버튼을 추가합니다. 
 <details>
 <summary>fragment_info.xml</summary>
@@ -2149,7 +2149,7 @@ class NewsRepositoryImpl(
     }
 ```
 
-## Show Saved Articles
+### Show Saved Articles
 저장된 기사들을 보여주는 화면은 `NewsFragment`와 같이 RecyclerView를 사용하고, 사용했던 `NewsAdapter`를 그대로 적용합니다. 
   그러기 위해서 `SavedFragment`의 Layout에 RecyclerView를 추가합니다. 
 <details>
@@ -2181,7 +2181,6 @@ class NewsRepositoryImpl(
 <details>
 <summary>SavedFragment.kt</summary>
 
-###
 ```kotlin
 class SavedFragment : Fragment() {
     private lateinit var fragmentSavedBinding: FragmentSavedBinding
@@ -2226,6 +2225,123 @@ class SavedFragment : Fragment() {
 </details>
 
 `findNavController().navigate`에 들어가는 Action의 id 값은 `action_savedFragment_to_infoFragment`로 바꿔줍니다. 
+
+
+### Delete Saved Article
+`ItemTouchHelper`를 구현하여 삭제 RecyclerView에서의 삭제 기능을 추가합니다. 
+  
+`ItemTouchHelper`객체를 `onViewCreated`함수에서 생성합니다. 
+```kotlin
+        val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+            ItemTouchHelper.RIGHT or ItemTouchHelper.LEFT
+        ) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                val article = newsAdapter.differ.currentList[position]
+                viewModel.deleteArticle(article)
+                Snackbar.make(view, "Deleted Successfully", Snackbar.LENGTH_LONG).apply {
+                    setAction("Undo") {
+                        viewModel.saveArticle(article)
+                    }
+                    show()
+                }
+            }
+        }
+```
+`SimpleCallback`의 첫 번째 인자 값은 드래그의 방향을 나타내고, 두 번째 인자 값은 swipe 될 방향을 나타냅니다. 
+RecyclerView 내 Item의 움직임을 나타내기 위해 `onMovew`함수는 `true`를 반환시키고, Item을 밀었을 때 결과를 나타내기 위해 `onSwiped`함수에서 `deleteArticle`함수를 추가합니다.
+
+생성한 `itemTouchHelper`객체를 RecyclerView에 등록하면 삭제 기능이 추가가 됩니다. 
+```kotlin 
+        ItemTouchHelper(itemTouchHelperCallback).apply {
+            attachToRecyclerView(fragmentSavedBinding.rvSavedNews)
+        }
+```
+<details>
+<summary>SavedFragment.kt</summary>
+
+```kotlin
+class SavedFragment : Fragment() {
+    private lateinit var fragmentSavedBinding: FragmentSavedBinding
+    private lateinit var viewModel: NewsViewModel
+    private lateinit var newsAdapter: NewsAdapter
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        // Inflate the layout for this fragment
+        return inflater.inflate(R.layout.fragment_saved, container, false)
+    }
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentSavedBinding = FragmentSavedBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        newsAdapter = (activity as MainActivity).newsAdapter
+        newsAdapter.setOnItemClickListener {
+            val bundle = Bundle().apply {
+                putSerializable("selected_article", it)
+            }
+            findNavController().navigate(
+                R.id.action_savedFragment_to_infoFragment,
+                bundle
+            )
+        }
+        initRecyclerView()
+        viewModel.getSavedNews().observe(viewLifecycleOwner) {
+            newsAdapter.differ.submitList(it)
+        }
+
+        // itemTouchHelperCallback
+        val itemTouchHelperCallback = object : ItemTouchHelper.SimpleCallback(
+            ItemTouchHelper.UP or ItemTouchHelper.DOWN,
+            ItemTouchHelper.RIGHT or ItemTouchHelper.LEFT
+        ) {
+            override fun onMove(
+                recyclerView: RecyclerView,
+                viewHolder: RecyclerView.ViewHolder,
+                target: RecyclerView.ViewHolder
+            ): Boolean {
+                return true
+            }
+
+            override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
+                val position = viewHolder.adapterPosition
+                val article = newsAdapter.differ.currentList[position]
+                viewModel.deleteArticle(article)
+                Snackbar.make(view, "Deleted Successfully", Snackbar.LENGTH_LONG).apply {
+                    setAction("Undo") {
+                        viewModel.saveArticle(article)
+                    }
+                    show()
+                }
+            }
+        }
+        ItemTouchHelper(itemTouchHelperCallback).apply {
+            attachToRecyclerView(fragmentSavedBinding.rvSavedNews)
+        }
+    }
+
+    private fun initRecyclerView() {
+        fragmentSavedBinding.rvSavedNews.apply {
+            adapter = newsAdapter
+            layoutManager = LinearLayoutManager(activity)
+        }
+    }
+}
+```
+</details>
+  
+
 
 ## Ref. 
 **Flow** - <br>
