@@ -7,6 +7,15 @@
     android:background="@color/layout_background"
     tools:context=".NewsFragment">
 
+    <androidx.appcompat.widget.SearchView
+        android:id="@+id/sv_news"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/search_background"
+
+        />
+
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/rv_news"
         android:layout_width="match_parent"
