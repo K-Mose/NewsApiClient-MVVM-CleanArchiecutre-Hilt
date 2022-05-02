@@ -1739,6 +1739,334 @@ class FactoryModule {
     }
 ```
   
+## Saved Articles
+마지막으로 기사를 저장하고 저장된 기사 리스트를 출력하고 저장된 기사를 삭제하는 기능을 추가하겠습니다. 
+  
+  [Room Database](https://github.com/K-Mose/RoomDemo)를 이용하기위해 아래의 dependencies를 추가합니다. 
+```xml
+    def room_version = "2.4.1"
+    implementation "androidx.room:room-ktx:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+```
+그리고 `Article`데이터 클래스에 @Entity 어노테이션을 추가합니다. 
+```kotlin
+@Entity(tableName = "articles")
+data class Article(
+    @PrimaryKey(autoGenerate = true)
+    val id: Int? = null,
+    ……
+)
+```
+  
+data 패키지에 Room DataBase 연결 클래스들을 생성할 db 패키지를 생성합니다. <br>
+  ![image](https://user-images.githubusercontent.com/55622345/166231477-12b96008-2f3f-46a8-b31c-1bf6a16820d5.png)  <br>
+  db 패키지 안에 DAO 인터페이스와 RoomDatabase 클래스를 생성합니다. <br>
+![image](https://user-images.githubusercontent.com/55622345/166231590-2b293e0b-e358-4020-afc2-778212f71261.png) <br>
+
+`Article`데이터 클래스의 source는 `Source`데이터 클래스를 타입으로 갖는데 이 클래스를 Database의 Table로 생성하는 것 보다 `TypeConverter`를 생성하여 `Source`데이터 클래스의 인스턴스를 `Article`데이터 클래스에게 제공하는 것이 효율적이므로 `Converters`클래스 를 생성합니다.
+```kotlin 
+class Converters {
+    @TypeConverter
+    fun fromSource(source: Source):String {
+        return source.name
+    }
+
+    @TypeConverter
+    fun toSource(name: String): Source {
+        return Source(name, name)
+    }
+}
+```
+  
+  우선 Database의 DAO 객체를 작성하겠습니다. 
+```kotlin
+@Dao
+interface ArticleDAO {
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(article: Article)
+
+    @Query("SELECT * FROM articles")
+    fun getAllArticles(): Flow<List<Article>>
+
+    @Delete
+    suspend fun deleteArticle(article: Article)
+}
+```  
+`ArticleDAO`인테페이스는 [Repository](#repository--usecase)에서 작성된 것 처럼 기사를 가져오는 것은 `LiveData`를 Data Layer에서 사용하지 못하므로 `Flow`객체로 가져오고, 저장과 삭제는 코루틴을 이용하여 `suspend fun`로 작성합니다. 
+
+  DAO를 작성했다면 Database 객체를 생성할 `ArticleDatabase`클래스를 생성합니다. 
+```kotlin
+@Database(
+    entities = [Article::class],
+    version = 2,
+    exportSchema = false
+)
+@TypeConverters(Converters::class)
+abstract class ArticleDatabase : RoomDatabase() {
+    abstract fun getArticleDAO(): ArticleDAO
+}
+```
+
+Room의 Database클래스까지 추가했다면 이제 Local Data에 연결할 `LocalDataSource`인터페이스와 클래스를 추가합니다. <br>
+![image](https://user-images.githubusercontent.com/55622345/166233637-184ab22c-4d25-458d-a469-7e78f18fed09.png) <br>
+
+  `NewsLocalDataSource`인터페이스의 구현체가 `ArticleDAO`인테페이스에직접 연결되므로 같은 형식으로 작서합니다. 
+```kotlin
+interface NewsLocalDataSource {
+    suspend fun saveArticleToDB(article: Article)
+    fun getSavedArticles():Flow<List<Article>>
+    suspend fun deleteArticleFromDB(article: Article)
+}
+```
+  
+  그리고 `NewsLocalDataSourceImpl`클래스 안에서 각각의 메소드가 (java코드로 자동으로 생성되어 의존성이 주입되는)`ArticleDAO`(구현체)에 접근하여 실행되므로 각각 DAO의 메소드에 맞게 구현합니다. 
+<details>
+<summary>ArticleDAO_impl</summary>
+
+  ![image](https://user-images.githubusercontent.com/55622345/166234100-93673f2e-b1ff-4a50-b3cd-fdd1fc108b4d.png)
+```kotlin
+public final class ArticleDAO_Impl implements ArticleDAO {
+  private final RoomDatabase __db;
+
+  private final EntityInsertionAdapter<Article> __insertionAdapterOfArticle;
+
+  private final Converters __converters = new Converters();
+
+  private final EntityDeletionOrUpdateAdapter<Article> __deletionAdapterOfArticle;
+
+  public ArticleDAO_Impl(RoomDatabase __db) {
+    this.__db = __db;
+    this.__insertionAdapterOfArticle = new EntityInsertionAdapter<Article>(__db) {
+      @Override
+      public String createQuery() {
+        return "INSERT OR REPLACE INTO `articles` (`id`,`author`,`content`,`description`,`publishedAt`,`source`,`title`,`url`,`urlToImage`) VALUES (?,?,?,?,?,?,?,?,?)";
+      }
+
+      @Override
+      public void bind(SupportSQLiteStatement stmt, Article value) {
+        if (value.getId() == null) {
+          stmt.bindNull(1);
+        } else {
+          stmt.bindLong(1, value.getId());
+        }
+        if (value.getAuthor() == null) {
+          stmt.bindNull(2);
+        } else {
+          stmt.bindString(2, value.getAuthor());
+        }
+        if (value.getContent() == null) {
+          stmt.bindNull(3);
+        } else {
+          stmt.bindString(3, value.getContent());
+        }
+        if (value.getDescription() == null) {
+          stmt.bindNull(4);
+        } else {
+          stmt.bindString(4, value.getDescription());
+        }
+        if (value.getPublishedAt() == null) {
+          stmt.bindNull(5);
+        } else {
+          stmt.bindString(5, value.getPublishedAt());
+        }
+        final String _tmp = __converters.fromSource(value.getSource());
+        if (_tmp == null) {
+          stmt.bindNull(6);
+        } else {
+          stmt.bindString(6, _tmp);
+        }
+        if (value.getTitle() == null) {
+          stmt.bindNull(7);
+        } else {
+          stmt.bindString(7, value.getTitle());
+        }
+        if (value.getUrl() == null) {
+          stmt.bindNull(8);
+        } else {
+          stmt.bindString(8, value.getUrl());
+        }
+        if (value.getUrlToImage() == null) {
+          stmt.bindNull(9);
+        } else {
+          stmt.bindString(9, value.getUrlToImage());
+        }
+      }
+    };
+    this.__deletionAdapterOfArticle = new EntityDeletionOrUpdateAdapter<Article>(__db) {
+      @Override
+      public String createQuery() {
+        return "DELETE FROM `articles` WHERE `id` = ?";
+      }
+
+      @Override
+      public void bind(SupportSQLiteStatement stmt, Article value) {
+        if (value.getId() == null) {
+          stmt.bindNull(1);
+        } else {
+          stmt.bindLong(1, value.getId());
+        }
+      }
+    };
+  }
+
+  @Override
+  public Object insert(final Article article, final Continuation<? super Unit> continuation) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      public Unit call() throws Exception {
+        __db.beginTransaction();
+        try {
+          __insertionAdapterOfArticle.insert(article);
+          __db.setTransactionSuccessful();
+          return Unit.INSTANCE;
+        } finally {
+          __db.endTransaction();
+        }
+      }
+    }, continuation);
+  }
+
+  @Override
+  public Object deleteArticle(final Article article,
+      final Continuation<? super Unit> continuation) {
+    return CoroutinesRoom.execute(__db, true, new Callable<Unit>() {
+      @Override
+      public Unit call() throws Exception {
+        __db.beginTransaction();
+        try {
+          __deletionAdapterOfArticle.handle(article);
+          __db.setTransactionSuccessful();
+          return Unit.INSTANCE;
+        } finally {
+          __db.endTransaction();
+        }
+      }
+    }, continuation);
+  }
+
+  @Override
+  public Flow<List<Article>> getAllArticles() {
+    final String _sql = "SELECT * FROM articles";
+    final RoomSQLiteQuery _statement = RoomSQLiteQuery.acquire(_sql, 0);
+    return CoroutinesRoom.createFlow(__db, false, new String[]{"articles"}, new Callable<List<Article>>() {
+      @Override
+      public List<Article> call() throws Exception {
+        final Cursor _cursor = DBUtil.query(__db, _statement, false, null);
+        try {
+          final int _cursorIndexOfId = CursorUtil.getColumnIndexOrThrow(_cursor, "id");
+          final int _cursorIndexOfAuthor = CursorUtil.getColumnIndexOrThrow(_cursor, "author");
+          final int _cursorIndexOfContent = CursorUtil.getColumnIndexOrThrow(_cursor, "content");
+          final int _cursorIndexOfDescription = CursorUtil.getColumnIndexOrThrow(_cursor, "description");
+          final int _cursorIndexOfPublishedAt = CursorUtil.getColumnIndexOrThrow(_cursor, "publishedAt");
+          final int _cursorIndexOfSource = CursorUtil.getColumnIndexOrThrow(_cursor, "source");
+          final int _cursorIndexOfTitle = CursorUtil.getColumnIndexOrThrow(_cursor, "title");
+          final int _cursorIndexOfUrl = CursorUtil.getColumnIndexOrThrow(_cursor, "url");
+          final int _cursorIndexOfUrlToImage = CursorUtil.getColumnIndexOrThrow(_cursor, "urlToImage");
+          final List<Article> _result = new ArrayList<Article>(_cursor.getCount());
+          while(_cursor.moveToNext()) {
+            final Article _item;
+            final Integer _tmpId;
+            if (_cursor.isNull(_cursorIndexOfId)) {
+              _tmpId = null;
+            } else {
+              _tmpId = _cursor.getInt(_cursorIndexOfId);
+            }
+            final String _tmpAuthor;
+            if (_cursor.isNull(_cursorIndexOfAuthor)) {
+              _tmpAuthor = null;
+            } else {
+              _tmpAuthor = _cursor.getString(_cursorIndexOfAuthor);
+            }
+            final String _tmpContent;
+            if (_cursor.isNull(_cursorIndexOfContent)) {
+              _tmpContent = null;
+            } else {
+              _tmpContent = _cursor.getString(_cursorIndexOfContent);
+            }
+            final String _tmpDescription;
+            if (_cursor.isNull(_cursorIndexOfDescription)) {
+              _tmpDescription = null;
+            } else {
+              _tmpDescription = _cursor.getString(_cursorIndexOfDescription);
+            }
+            final String _tmpPublishedAt;
+            if (_cursor.isNull(_cursorIndexOfPublishedAt)) {
+              _tmpPublishedAt = null;
+            } else {
+              _tmpPublishedAt = _cursor.getString(_cursorIndexOfPublishedAt);
+            }
+            final Source _tmpSource;
+            final String _tmp;
+            if (_cursor.isNull(_cursorIndexOfSource)) {
+              _tmp = null;
+            } else {
+              _tmp = _cursor.getString(_cursorIndexOfSource);
+            }
+            _tmpSource = __converters.toSource(_tmp);
+            final String _tmpTitle;
+            if (_cursor.isNull(_cursorIndexOfTitle)) {
+              _tmpTitle = null;
+            } else {
+              _tmpTitle = _cursor.getString(_cursorIndexOfTitle);
+            }
+            final String _tmpUrl;
+            if (_cursor.isNull(_cursorIndexOfUrl)) {
+              _tmpUrl = null;
+            } else {
+              _tmpUrl = _cursor.getString(_cursorIndexOfUrl);
+            }
+            final String _tmpUrlToImage;
+            if (_cursor.isNull(_cursorIndexOfUrlToImage)) {
+              _tmpUrlToImage = null;
+            } else {
+              _tmpUrlToImage = _cursor.getString(_cursorIndexOfUrlToImage);
+            }
+            _item = new Article(_tmpId,_tmpAuthor,_tmpContent,_tmpDescription,_tmpPublishedAt,_tmpSource,_tmpTitle,_tmpUrl,_tmpUrlToImage);
+            _result.add(_item);
+          }
+          return _result;
+        } finally {
+          _cursor.close();
+        }
+      }
+
+      @Override
+      protected void finalize() {
+        _statement.release();
+      }
+    });
+  }
+
+  public static List<Class<?>> getRequiredConverters() {
+    return Collections.emptyList();
+  }
+}  
+```
+</details>
+
+
+
+```kotlin
+class NewsLocalDataSourceImpl(
+    private val articleDAO: ArticleDAO
+) : NewsLocalDataSource {
+    override suspend fun saveArticleToDB(article: Article) {
+        articleDAO.insert(article)
+    }
+
+    override fun getSavedArticles(): Flow<List<Article>> {
+        return articleDAO.getAllArticles()
+    }
+
+    override suspend fun deleteArticleFromDB(article: Article) {
+        articleDAO.deleteArticle(article)
+    }
+}
+```
+
+  
+## Save Article
+
 
 
 ## Ref. 
