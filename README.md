@@ -125,7 +125,7 @@ Flow는 비동기식으로 데이터 스트림을 계산하여 방출하기 위�
 
 이제 각각 UseCase에서 데이터에 접근할 Repository를 작성합니다. 
 <details>
-  <summary><b>UseCases</b></summary>
+  <summary id="UseCases"><b>UseCases</b></summary>
   
   ### GetNewsHeadlinesUseCase
   ```kotlin
@@ -1748,6 +1748,8 @@ class FactoryModule {
     implementation "androidx.room:room-ktx:$room_version"
     kapt "androidx.room:room-compiler:$room_version"
 ```
+
+### Database & DAO
 그리고 `Article`데이터 클래스에 @Entity 어노테이션을 추가합니다. 
 ```kotlin
 @Entity(tableName = "articles")
@@ -1807,6 +1809,7 @@ abstract class ArticleDatabase : RoomDatabase() {
 }
 ```
 
+### DataSource
 Room의 Database클래스까지 추가했다면 이제 Local Data에 연결할 `LocalDataSource`인터페이스와 클래스를 추가합니다. <br>
 ![image](https://user-images.githubusercontent.com/55622345/166233637-184ab22c-4d25-458d-a469-7e78f18fed09.png) <br>
 
@@ -2064,11 +2067,90 @@ class NewsLocalDataSourceImpl(
 }
 ```
 
+### Repository 
+[Repository](#repository--usecase)에서 작성된 `NewsRepository`인터페이스의 구현체에 기사 저장 함수들을 추가합니다. 
+```kotlin
+class NewsRepositoryImpl(
+    private val newsRemoteDataSource: NewsRemoteDataSource,
+    private val newsLocalDataSource: NewsLocalDataSource
+) : NewsRepository {
+    ……
+    override suspend fun saveNews(article: Article) {
+        newsLocalDataSource.saveArticleToDB(article)
+    }
+
+    override suspend fun deleteNews(article: Article) {
+        newsLocalDataSource.deleteArticleFromDB(article)
+    }
+
+    override fun getSavedNews(): Flow<List<Article>> {
+        return newsLocalDataSource.getSavedArticles()
+    }
+}
+``` 
+  
+
   
 ## Save Article
+기사를 저장하기 앞서 `InfoFragment`의 Layout에 저장 버튼을 추가합니다. 
+<details>
+<summary>fragment_info.xml</summary>
+  
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    tools:context=".InfoFragment">
 
+    <WebView
+        android:id="@+id/wv_info"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+    />
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_save"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:src="@drawable/ic_saved_news_24"
+        app:layout_constraintVertical_bias="0.95"
+        app:layout_constraintHorizontal_bias="0.95"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        />
 
+</androidx.constraintlayout.widget.ConstraintLayout>
+```
+</details>
+
+그리고 `NewsRepository`와 연결할 [`SaveNewsUseCase`](#UseCase)는 이미 구현되어 있으니 Fragment를 작성합니다. 
+`InfoFragment`에서  전역 변수로 `private lateinit var viewModel: NewsViewModel`를 추가하여 ViewModel을 통해 UseCase에 접근 할 수 있도록 합니다. 
+그리고 `FloatingActionButton`버튼의 리스너를 추가합니다. 
+```kotlin 
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        fragmentInfoBinding = FragmentInfoBinding.bind(view)
+        viewModel = (activity as MainActivity).viewModel
+        ……
+        fragmentInfoBinding.fabSave.setOnClickListener {
+            viewModel.saveArticle(article)
+            Snackbar.make(view, "Saved Successfully", Snackbar.LENGTH_LONG).show()
+        }
+    }
+```
+
+  
+  
 ## Ref. 
 **Flow** - <br>
 https://developer.android.com/kotlin/flow </br>
