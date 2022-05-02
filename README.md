@@ -5,6 +5,18 @@ Retrofit을 이용하여 newsapi.org에서 최신 뉴스 헤드라인을 검색�
 헤드라인을 클릭하면 기사의 전문을 볼 수 있고, 
 뉴스 기사 안에서는 저장버튼을 통해서 뉴스를 저장하고, 저장된 뉴스 리스트에서는 저장된 뉴스를 밀어서 뉴스를 삭제할 수 있습니다. 
 
+## PreView
+
+https://user-images.githubusercontent.com/55622345/166254042-6574fb68-8f65-4991-8e0a-f4bc83cbb98b.mp4
+
+
+
+
+https://user-images.githubusercontent.com/55622345/166254077-ab070848-0080-4151-bf9b-5044c23dd8d9.mp4
+
+
+
+
 ## UseCase 
 우선 위의 소개된 시나리오에 따라서 필요 기능을 생각하고 UseCase를 작성합니다. 
 <img src="https://user-images.githubusercontent.com/55622345/165213342-193928e0-5a5f-4607-af8d-15ce77e9d37a.png" width="600px"/>
