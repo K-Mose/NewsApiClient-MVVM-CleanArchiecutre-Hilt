@@ -7,7 +7,7 @@ import com.kmose.newsapiclient.data.model.Article
 
 @Database(
     entities = [Article::class],
-    version = 1,
+    version = 2,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

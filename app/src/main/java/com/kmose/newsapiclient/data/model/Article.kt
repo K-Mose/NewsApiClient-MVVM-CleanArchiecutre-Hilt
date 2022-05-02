@@ -7,7 +7,7 @@ import com.google.gson.annotations.SerializedName
 import java.io.Serializable
 
 @Entity(
-    tableName = "article"
+    tableName = "articles"
 )
 data class Article(
     @PrimaryKey(autoGenerate = true)

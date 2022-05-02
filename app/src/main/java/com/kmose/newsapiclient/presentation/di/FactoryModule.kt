@@ -2,6 +2,7 @@ package com.kmose.newsapiclient.presentation.di
 
 import android.app.Application
 import com.kmose.newsapiclient.domain.usecase.GetNewsHeadlinesUseCase
+import com.kmose.newsapiclient.domain.usecase.GetSavedNewsUseCase
 import com.kmose.newsapiclient.domain.usecase.GetSearchedNewsUseCase
 import com.kmose.newsapiclient.domain.usecase.SaveNewsUseCase
 import com.kmose.newsapiclient.presentation.viewmodel.NewsViewModelFactory
@@ -20,13 +21,15 @@ class FactoryModule {
         app: Application,
         getNewsHeadlinesUseCase: GetNewsHeadlinesUseCase,
         getSearchedNewsUseCase: GetSearchedNewsUseCase,
-        saveNewsUseCase: SaveNewsUseCase
+        saveNewsUseCase: SaveNewsUseCase,
+        getSavedNewsUseCase: GetSavedNewsUseCase
     ): NewsViewModelFactory {
         return NewsViewModelFactory(
             app,
             getNewsHeadlinesUseCase,
             getSearchedNewsUseCase,
-            saveNewsUseCase
+            saveNewsUseCase,
+            getSavedNewsUseCase
         )
     }
 }

@@ -2,6 +2,7 @@ package com.kmose.newsapiclient.presentation.di
 
 import com.kmose.newsapiclient.domain.repository.NewsRepository
 import com.kmose.newsapiclient.domain.usecase.GetNewsHeadlinesUseCase
+import com.kmose.newsapiclient.domain.usecase.GetSavedNewsUseCase
 import com.kmose.newsapiclient.domain.usecase.GetSearchedNewsUseCase
 import com.kmose.newsapiclient.domain.usecase.SaveNewsUseCase
 import dagger.Module
@@ -35,5 +36,13 @@ class UseCaseModule {
         newsRepository: NewsRepository
     ): SaveNewsUseCase {
         return SaveNewsUseCase(newsRepository)
+    }
+
+    @Singleton
+    @Provides
+    fun providesGetSavedNewsUseCase(
+        newsRepository: NewsRepository
+    ): GetSavedNewsUseCase {
+        return GetSavedNewsUseCase(newsRepository)
     }
 }

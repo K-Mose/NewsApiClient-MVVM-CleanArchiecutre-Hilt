@@ -16,7 +16,7 @@
     </fragment>
     <fragment
         android:id="@+id/savedFragment"
-        android:name="com.kmose.newsapiclient.savedFragment"
+        android:name="com.kmose.newsapiclient.SavedFragment"
         android:label="fragment_saved"
         tools:layout="@layout/fragment_saved" >
         <action

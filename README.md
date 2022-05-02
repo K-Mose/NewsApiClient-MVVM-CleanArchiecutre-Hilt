@@ -785,7 +785,7 @@ Android Resource File로 Navigation을 추가 후 아래와 같이 Destination�
     </fragment>
     <fragment
         android:id="@+id/savedFragment"
-        android:name="com.kmose.newsapiclient.savedFragment"
+        android:name="com.kmose.newsapiclient.SavedFragment"
         android:label="fragment_saved"
         tools:layout="@layout/fragment_saved" >
         <action
