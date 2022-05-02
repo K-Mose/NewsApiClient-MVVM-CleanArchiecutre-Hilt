@@ -1481,6 +1481,14 @@ class InfoFragment : Fragment() {
 ```
 `nav_graph.xml`에서 `<fragment@InfoFragment/>`에 `<argument/>`를 추가했기 때문에 `Bundle`로 전송한 데이터를 `InfoFragmentArgs`로 객체를 받습니다. 
  그리고 `WebViewClient`를 사용해서 `WebView`를 초기화 후 url 값을 확인하여 `WebView`에 전달하여 화면을 출력합니다. 
+  
+**※ CLEAR_TEXT_TRAFFIC ERROR ※** <br>
+  `WebView`에서 페이지를 띄울 때 `CLEAR_TEXT_TRAFFIC ERROR`가 발생한다면 `Manifest`의 `<application/>`에 아래와 같이 추가합니다. 
+  ```xml
+<application
+    ……
+    android:usesCleartextTraffic="true">
+```
 
 ## Ref. 
 **Flow** - <br>
