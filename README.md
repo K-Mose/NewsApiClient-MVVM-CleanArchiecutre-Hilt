@@ -1,5 +1,5 @@
 # NewsApiClient-MVVM-CleanArchiecutre-Hilt
-https://newsapi.org/ 를 이용한 NewsApi App (with MVVM, Clean Architecture, Hilt)
+https://newsapi.org/ 를 이용한 NewsApi App (with [MVVM](https://github.com/K-Mose/TMDBClient---MVVM-with-Clean-Architecture#android-mvvm-pattern), [Clean Architecture](https://github.com/K-Mose/TMDBClient---MVVM-with-Clean-Architecture#clean-architecure), [Hilt](https://github.com/K-Mose/Hilt_Fundamentals))
 ### Introduction
 Retrofit을 이용하여 newsapi.org에서 최신 뉴스 헤드라인을 검색하여 API로 가져옵니다. 
 헤드라인을 클릭하면 기사의 전문을 볼 수 있고, 
@@ -2341,7 +2341,52 @@ class SavedFragment : Fragment() {
 ```
 </details>
   
+## Dependency
+**project level `build.gradle`**
+```
+    def nav_version = "2.4.2"
+    classpath "androidx.navigation:navigation-safe-args-gradle-plugin:$nav_version"
+```
 
+**app level `build.gradle`**
+```
+    def lifecycle_version = "2.5.0-alpha06"
+    def room_version = "2.4.1"
+    def retrofit_version = "2.7.0"
+    def nav_version = "2.4.2"
+
+    // ViewModel
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:$lifecycle_version"
+    // LiveData
+    implementation "androidx.lifecycle:lifecycle-livedata-ktx:$lifecycle_version"
+    // Annotation processor
+    kapt "androidx.lifecycle:lifecycle-compiler:$lifecycle_version"
+
+    // Hilt
+    implementation "com.google.dagger:hilt-android:2.38.1"
+    kapt "com.google.dagger:hilt-compiler:2.38.1"
+
+    // Navigation
+    implementation "androidx.navigation:navigation-fragment-ktx:$nav_version"
+    implementation "androidx.navigation:navigation-ui-ktx:$nav_version"
+
+    // Glide
+    implementation 'com.github.bumptech.glide:glide:4.13.0'
+    kapt 'com.github.bumptech.glide:compiler:4.13.0'
+
+    // Room
+    implementation "androidx.room:room-ktx:$room_version"
+    kapt "androidx.room:room-compiler:$room_version"
+
+    // Retrofit
+    implementation "com.squareup.retrofit2:retrofit:$retrofit_version"
+    implementation "com.squareup.retrofit2:converter-gson:$retrofit_version"
+    implementation "com.squareup.okhttp3:okhttp:4.9.3"
+    implementation 'com.google.code.gson:gson:2.9.0'
+
+    testImplementation "com.squareup.okhttp3:mockwebserver:4.9.3"
+    testImplementation "com.google.truth:truth:1.1.3"
+```
 
 ## Ref. 
 **Flow** - <br>
