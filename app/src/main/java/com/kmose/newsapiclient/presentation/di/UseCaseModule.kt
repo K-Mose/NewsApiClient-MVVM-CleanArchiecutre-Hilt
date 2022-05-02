@@ -1,10 +1,7 @@
 package com.kmose.newsapiclient.presentation.di
 
 import com.kmose.newsapiclient.domain.repository.NewsRepository
-import com.kmose.newsapiclient.domain.usecase.GetNewsHeadlinesUseCase
-import com.kmose.newsapiclient.domain.usecase.GetSavedNewsUseCase
-import com.kmose.newsapiclient.domain.usecase.GetSearchedNewsUseCase
-import com.kmose.newsapiclient.domain.usecase.SaveNewsUseCase
+import com.kmose.newsapiclient.domain.usecase.*
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -44,5 +41,13 @@ class UseCaseModule {
         newsRepository: NewsRepository
     ): GetSavedNewsUseCase {
         return GetSavedNewsUseCase(newsRepository)
+    }
+
+    @Singleton
+    @Provides
+    fun providesDeleteSavedNewsUseCase(
+        newsRepository: NewsRepository
+    ): DeleteSavedNewsUseCase {
+        return DeleteSavedNewsUseCase(newsRepository)
     }
 }
